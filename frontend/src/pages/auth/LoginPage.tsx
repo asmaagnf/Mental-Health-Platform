@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const LoginPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -63,13 +65,20 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
 
-      alert('Login successful!');
-      window.location.href = '/dashboard';
+      toast.success('Login successful!');
+      // Role-based redirect
+      if (user.role === 'PATIENT') {
+        navigate('/patient/health');
+      } else if (user.role === 'THERAPIST') {
+        navigate('/therapist/TherapistDashboard');
+      } else {
+        navigate('/404');
+      }
     } catch (error: any) {
       if (error.response?.data?.message) {
-        alert(error.response.data.message);
+        toast.error(error.response.data.message);
       } else {
-        alert('An error occurred while logging in.');
+        toast.error('An error occurred while logging in.');
       }
     } finally {
       setLoading(false);

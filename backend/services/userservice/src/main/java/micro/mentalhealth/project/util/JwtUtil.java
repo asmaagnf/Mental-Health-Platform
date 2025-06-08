@@ -38,15 +38,15 @@ public class JwtUtil {
     /**
      * Générer un token JWT avec le nom d'utilisateur, le rôle et l'ID utilisateur
      */
-    public String generateToken(String username, String role, Long userId) {
+    public String generateToken(String username, String role, String userId) {
         return Jwts.builder()
-                .claim("role", role)          // Ajouter la revendication de rôle
-                .claim("userId", userId)      // Ajouter la revendication d'ID utilisateur
-                .setSubject(username)         // Ajouter le sujet (nom d'utilisateur)
-                .setIssuedAt(new Date(System.currentTimeMillis())) // Heure d'émission
-                .setExpiration(new Date(System.currentTimeMillis() + expirationTime)) // Heure d'expiration
-                .signWith(signingKey, SignatureAlgorithm.HS256) // Signer avec la clé et l'algorithme
-                .compact(); // Générer le token
+                .claim("role", role)
+                .claim("userId", userId)  // userId as String now
+                .setSubject(username)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .compact();
     }
 
     /**

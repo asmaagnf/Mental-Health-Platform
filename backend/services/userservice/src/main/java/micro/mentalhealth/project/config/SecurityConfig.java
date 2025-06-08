@@ -24,7 +24,7 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable) // Désactive la protection CSRF
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Ajoute la configuration CORS ici
                 .authorizeHttpRequests(authorize -> authorize // Configuration des autorisations d'accès
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/users/**").permitAll() // Autorise l'accès à ces endpoints pour tous
+                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/user/**").permitAll() // Autorise l'accès à ces endpoints pour tous
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // Autorise l'accès aux endpoints admin uniquement pour les utilisateurs avec le rôle ADMIN
                         .requestMatchers("/api/therapist/**").hasRole("THERAPIST") // Autorise l'accès aux endpoints résident uniquement pour les utilisateurs avec le rôle RESIDENT
                         .anyRequest().authenticated()); // Toutes les autres requêtes nécessitent une authentification

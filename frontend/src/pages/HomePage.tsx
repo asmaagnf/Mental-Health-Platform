@@ -25,7 +25,7 @@ const HomePage: React.FC = () => {
             </div>
             <div className="hidden md:block">
               <img 
-                src="https://images.pexels.com/photos/3760278/pexels-photo-3760278.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" 
+                src="https://images.pexels.com/photos/5699475/pexels-photo-5699475.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" 
                 alt="Therapy Session" 
                 className="rounded-lg shadow-lg"
               />

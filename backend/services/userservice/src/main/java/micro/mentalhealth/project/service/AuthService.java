@@ -3,7 +3,7 @@ package micro.mentalhealth.project.service;
 import micro.mentalhealth.project.dto.AuthRequestDTO;
 import micro.mentalhealth.project.dto.AuthResponseDTO;
 import micro.mentalhealth.project.dto.RegisterRequestDTO;
-import micro.mentalhealth.project.model.User;
+import micro.mentalhealth.project.model.*;
 import micro.mentalhealth.project.repository.UserRepository;
 import micro.mentalhealth.project.util.JwtUtil;
 import micro.mentalhealth.project.mapper.UserMapper;
@@ -30,19 +30,16 @@ public class AuthService {
     private UserMapper userMapper;
 
     public AuthResponseDTO register(RegisterRequestDTO request) {
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setDateOfBirth(request.getDateOfBirth());
-        user.setAddress(request.getAddress());
-        user.setGender(request.getGender());
-        user.setProfilePictureUrl(request.getProfilePictureUrl());
-        user.setRole(User.Role.valueOf(request.getRole().toUpperCase()));
+        User user = userMapper.toEntity(request);
+        user.setPassword(passwordEncoder.encode(request.getPassword())); // encode password after mapping
 
         User savedUser = userRepository.save(user);
-        String token = jwtUtil.generateToken(savedUser.getEmail(), savedUser.getRole().name(), savedUser.getId());
+
+        String token = jwtUtil.generateToken(
+                savedUser.getEmail().getValue(),
+                savedUser.getRole().name(),
+                savedUser.getId().toString()
+        );
 
         AuthResponseDTO response = new AuthResponseDTO();
         response.setToken(token);
@@ -52,7 +49,7 @@ public class AuthService {
     }
 
     public AuthResponseDTO authenticate(AuthRequestDTO request) {
-        Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
+        Optional<User> optionalUser = userRepository.findByEmail(new Email(request.getEmail())); // <-- conversion ici
         if (optionalUser.isEmpty()) {
             throw new RuntimeException("Invalid email or password");
         }
@@ -62,7 +59,11 @@ public class AuthService {
             throw new RuntimeException("Invalid email or password");
         }
 
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getId());
+        String token = jwtUtil.generateToken(
+                user.getEmail().getValue(),
+                user.getRole().name(),
+                user.getId().toString()
+        );
         AuthResponseDTO response = new AuthResponseDTO();
         response.setToken(token);
         response.setUser(userMapper.toDTO(user));

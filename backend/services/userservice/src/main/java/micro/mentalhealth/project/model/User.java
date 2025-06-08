@@ -1,32 +1,39 @@
 package micro.mentalhealth.project.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Pattern;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
+
+import micro.mentalhealth.project.model.Address;
+import micro.mentalhealth.project.model.Email;
+import micro.mentalhealth.project.model.PhoneNumber;
 
 @Entity
 @Table(name = "users")
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue
+    private UUID id;
 
     private String name;
 
-    @Column(unique = true, nullable = false)
-    @Email(message = "Email should be valid")
-    private String email;
+    @Embedded
+    private Email email;
 
     private String password;
-    @Pattern(regexp = "\\d{10}", message = "Phone number must be exactly 10 digits")
-    private String phoneNumber;
+
+    @Embedded
+    private PhoneNumber phoneNumber;
+
     private LocalDate dateOfBirth;
-    private String address;
-    private String gender;
+
+    @Embedded
+    private Address address;
+
+    @Enumerated(EnumType.STRING)
+    private Gender gender;
 
     @Enumerated(EnumType.STRING)
     private Role role;
@@ -46,17 +53,14 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    public enum Role {
-        PATIENT, THERAPIST, ADMIN
-    }
 
     // Getters and Setters
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
@@ -68,11 +72,11 @@ public class User {
         this.name = name;
     }
 
-    public String getEmail() {
+    public Email getEmail() {
         return email;
     }
 
-    public void setEmail(String email) {
+    public void setEmail(Email email) {
         this.email = email;
     }
 
@@ -84,11 +88,11 @@ public class User {
         this.password = password;
     }
 
-    public String getPhoneNumber() {
+    public PhoneNumber getPhoneNumber() {
         return phoneNumber;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
+    public void setPhoneNumber(PhoneNumber phoneNumber) {
         this.phoneNumber = phoneNumber;
     }
 
@@ -100,19 +104,19 @@ public class User {
         this.dateOfBirth = dateOfBirth;
     }
 
-    public String getAddress() {
+    public Address getAddress() {
         return address;
     }
 
-    public void setAddress(String address) {
+    public void setAddress(Address address) {
         this.address = address;
     }
 
-    public String getGender() {
+    public Gender getGender() {
         return gender;
     }
 
-    public void setGender(String gender) {
+    public void setGender(Gender gender) {
         this.gender = gender;
     }
 

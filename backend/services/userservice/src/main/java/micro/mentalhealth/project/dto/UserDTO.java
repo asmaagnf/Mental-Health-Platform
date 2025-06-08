@@ -2,9 +2,10 @@ package micro.mentalhealth.project.dto;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public class UserDTO {
-    private Long id;
+    private UUID id;
     private String name;
     private String email;
     private String phoneNumber;
@@ -18,11 +19,11 @@ public class UserDTO {
 
     // Getters and Setters
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const RegisterPage: React.FC = () => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     confirmPassword: '',
-    userType: 'patient', // patient or therapist
+    userType: 'PATIENT', // backend expects uppercase enum names
+    gender: '',          // e.g., "MALE", "FEMALE"
     agreeTerms: false,
   });
 
@@ -18,7 +23,9 @@ const RegisterPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
@@ -27,45 +34,28 @@ const RegisterPage: React.FC = () => {
       [name]: type === 'checkbox' ? checked : value,
     });
 
-    // Clear error when user types
     if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: '',
-      });
+      setErrors({ ...errors, [name]: '' });
     }
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.firstName.trim()) {
+    if (!formData.firstName.trim())
       newErrors.firstName = 'First name is required';
-    }
-
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
-
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
+    if (!formData.email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
       newErrors.email = 'Invalid email address';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 8)
       newErrors.password = 'Password must be at least 8 characters';
-    }
-
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.password !== formData.confirmPassword)
       newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (!formData.agreeTerms) {
+    if (!formData.gender) newErrors.gender = 'Gender is required';
+    if (!formData.agreeTerms)
       newErrors.agreeTerms = 'You must agree to the terms and conditions';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -74,42 +64,46 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (validateForm()) {
-      setIsSubmitting(true);
+    if (!validateForm()) return;
 
-      const requestPayload = {
-        name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        password: formData.password,
-        phoneNumber: '', // Include phone number if needed
-        dateOfBirth: '', // Include date of birth if needed
-        address: '', // Include address if needed
-        gender: '', // Include gender if needed
-        profilePictureUrl: '', // Include profile picture URL if needed
-        role: formData.userType,
-      };
+    setIsSubmitting(true);
 
-      try {
-        // Replace with your backend API URL
-        const response = await axios.post('http://localhost:8090/api/auth/register', requestPayload);
+    // Compose payload with embedded objects and enums (uppercase)
+    const requestPayload = {
+      name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+    email: formData.email.trim(),
+  password: formData.password,
+  phoneNumber: formData.phoneNumber.trim() || null,
+  dateOfBirth: null,
+  address: null,
+  gender: formData.gender.toUpperCase(),
+  role: formData.userType.toUpperCase(),
+      // Do NOT send profilePictureUrl
+    };
 
-        if (response.status === 200) {
-          alert('Registration successful! Redirecting to login...');
-          // Redirect to login page or handle the response as needed
-        }
-      } catch (error) {
-        console.error('Error during registration:', error);
-        alert('Registration failed! Please try again.');
-      } finally {
-        setIsSubmitting(false);
+    try {
+      const response = await axios.post(
+        'http://localhost:8090/api/auth/register',
+        requestPayload
+      );
+
+      if (response.status === 200) {
+        toast.success('Registration successful!');
+        setTimeout(() => navigate('/login'), 1500);
       }
+    } catch (error: any) {
+      console.error('Error during registration:', error);
+      toast.error(
+        error?.response?.data?.message || 'Registration failed! Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const passwordStrength = () => {
     const { password } = formData;
     if (!password) return { text: '', color: '' };
-
     if (password.length < 8) return { text: 'Weak', color: 'text-red-500' };
     if (password.length < 12) return { text: 'Moderate', color: 'text-yellow-500' };
     return { text: 'Strong', color: 'text-green-500' };
@@ -120,13 +114,17 @@ const RegisterPage: React.FC = () => {
       <div className="max-w-lg w-full bg-white rounded-lg shadow-md p-8 animate-fade-in">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-slate-900 mb-6">Create an Account</h2>
-          <p className="text-slate-600 mb-8">Join MindPulse and start your mental wellness journey</p>
+          <p className="text-slate-600 mb-8">
+            Join MindPulse and start your mental wellness journey
+          </p>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstName" className="form-label">First name</label>
+              <label htmlFor="firstName" className="form-label">
+                First name
+              </label>
               <input
                 id="firstName"
                 name="firstName"
@@ -140,7 +138,9 @@ const RegisterPage: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="lastName" className="form-label">Last name</label>
+              <label htmlFor="lastName" className="form-label">
+                Last name
+              </label>
               <input
                 id="lastName"
                 name="lastName"
@@ -155,7 +155,9 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label htmlFor="email" className="form-label">Email address</label>
+            <label htmlFor="email" className="form-label">
+              Email address
+            </label>
             <input
               id="email"
               name="email"
@@ -169,7 +171,9 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label htmlFor="userType" className="form-label">I am a:</label>
+            <label htmlFor="userType" className="form-label">
+              I am a:
+            </label>
             <select
               id="userType"
               name="userType"
@@ -177,13 +181,49 @@ const RegisterPage: React.FC = () => {
               value={formData.userType}
               onChange={handleChange}
             >
-              <option value="patient">Patient (seeking therapy)</option>
-              <option value="therapist">Therapist (providing services)</option>
+              <option value="PATIENT">Patient (seeking therapy)</option>
+              <option value="THERAPIST">Therapist (providing services)</option>
             </select>
           </div>
 
           <div>
-            <label htmlFor="password" className="form-label">Password</label>
+            <label htmlFor="phoneNumber" className="form-label">
+              Phone Number
+            </label>
+            <input
+              id="phoneNumber"
+              name="phoneNumber"
+              type="tel"
+              autoComplete="tel"
+              className={`form-input ${errors.phoneNumber ? 'border-red-500' : ''}`}
+              value={formData.phoneNumber}
+              onChange={handleChange}
+            />
+            {errors.phoneNumber && <p className="form-error">{errors.phoneNumber}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="gender" className="form-label">
+              Gender
+            </label>
+            <select
+              id="gender"
+              name="gender"
+              className={`form-input ${errors.gender ? 'border-red-500' : ''}`}
+              value={formData.gender}
+              onChange={handleChange}
+            >
+              <option value="">Select gender</option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+            </select>
+            {errors.gender && <p className="form-error">{errors.gender}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="password" className="form-label">
+              Password
+            </label>
             <div className="relative">
               <input
                 id="password"
@@ -212,7 +252,9 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="form-label">Confirm password</label>
+            <label htmlFor="confirmPassword" className="form-label">
+              Confirm password
+            </label>
             <div className="relative">
               <input
                 id="confirmPassword"
@@ -241,37 +283,36 @@ const RegisterPage: React.FC = () => {
             <div className="ml-3 text-sm">
               <label htmlFor="agreeTerms" className="text-slate-700">
                 I agree to the{' '}
-                <Link to="/terms" className="text-teal-600 hover:text-teal-500">
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link to="/privacy" className="text-teal-600 hover:text-teal-500">
-                  Privacy Policy
+                <Link
+                  to="/terms"
+                  className="font-medium text-teal-600 hover:text-teal-500"
+                  target="_blank"
+                >
+                  terms and conditions
                 </Link>
               </label>
               {errors.agreeTerms && <p className="form-error">{errors.agreeTerms}</p>}
             </div>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              className={`w-full btn btn-primary ${isSubmitting ? 'opacity-50' : ''}`}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Create Account'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-3 px-4 rounded-md bg-teal-600 text-white font-semibold hover:bg-teal-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Registering...' : 'Create Account'}
+          </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-teal-600 hover:text-teal-500">
-              Sign in
-            </Link>
-          </p>
-        </div>
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="font-medium text-teal-600 hover:text-teal-500"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   );
