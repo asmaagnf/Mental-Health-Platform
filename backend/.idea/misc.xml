@@ -13,6 +13,8 @@
         <option value="$PROJECT_DIR$/services/HealthTrackingservice/pom.xml" />
         <option value="$PROJECT_DIR$/services/feedbackservice/feedbackservice/pom.xml" />
         <option value="$PROJECT_DIR$/services/feedbackservice/pom.xml" />
+        <option value="$PROJECT_DIR$/services/therapeuteService/pom.xml" />
+        <option value="$PROJECT_DIR$/services/gateway/pom.xml" />
       </list>
     </option>
   </component>
