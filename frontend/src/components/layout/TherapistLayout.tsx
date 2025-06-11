@@ -4,7 +4,7 @@ const TherapistLayout = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.clear(); // or sessionStorage.clear();
+    localStorage.clear(); 
     navigate('/');
   };
 
@@ -21,7 +21,8 @@ const TherapistLayout = () => {
               </Link>
             <div className="flex space-x-4 items-center">
               <NavLink to="/therapist/TherapistDashboard" className={({ isActive }) => navStyle(isActive)}>Dashboard</NavLink>
-              <NavLink to="/therapist/TherapistPaymentHistory" className={({ isActive }) => navStyle(isActive)}>Payments</NavLink>
+             <NavLink to="/therapist/appointments" className={({ isActive }) => navStyle(isActive)}>Appointments</NavLink>
+             <NavLink to="/therapist/historiqueSeance" className={({ isActive }) => navStyle(isActive)}>historiqueSeance</NavLink>
               <NavLink to="/therapist/TherapistProfile" className={({ isActive }) => navStyle(isActive)}>Profile</NavLink>
               <button
                 onClick={handleLogout}

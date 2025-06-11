@@ -11,6 +11,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 
 import java.util.List;
 
@@ -24,13 +25,15 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable) // Désactive la protection CSRF
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Ajoute la configuration CORS ici
                 .authorizeHttpRequests(authorize -> authorize // Configuration des autorisations d'accès
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/user/**").permitAll() // Autorise l'accès à ces endpoints pour tous
+                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/user/**","/**").permitAll() // Autorise l'accès à ces endpoints pour tous
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // Autorise l'accès aux endpoints admin uniquement pour les utilisateurs avec le rôle ADMIN
                         .requestMatchers("/api/therapist/**").hasRole("THERAPIST") // Autorise l'accès aux endpoints résident uniquement pour les utilisateurs avec le rôle RESIDENT
                         .anyRequest().authenticated()); // Toutes les autres requêtes nécessitent une authentification
 
         return http.build(); // Construit la configuration de sécurité
     }
+
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,7 +48,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
 
         // Autorise tous les méthodes HTTP (GET, POST, PUT, DELETE, etc.)
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"));
+        configuration.setAllowedMethods(List.of("*"));
 
         // Autorise tous les en-têtes
         configuration.setAllowedHeaders(List.of("*"));

@@ -71,7 +71,9 @@ const LoginPage: React.FC = () => {
         navigate('/patient/health');
       } else if (user.role === 'THERAPIST') {
         navigate('/therapist/TherapistDashboard');
-      } else {
+       } else if(user.role === 'ADMIN')
+        { navigate('/admin/dashboard');}
+       else {
         navigate('/404');
       }
     } catch (error: any) {

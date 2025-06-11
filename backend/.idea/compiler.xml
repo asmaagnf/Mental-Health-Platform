@@ -29,10 +29,18 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.30/lombok-1.18.30.jar" />
         </processorPath>
         <module name="therapeuteservice" />
-        <module name="sessionservice" />
         <module name="feedbackservice" />
         <module name="HealthTrackingservice" />
+      </profile>
+      <profile name="Annotation profile for sessionservice" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/unknown/lombok-unknown.jar" />
+        </processorPath>
         <module name="paymentservice" />
+        <module name="sessionservice" />
       </profile>
     </annotationProcessing>
   </component>

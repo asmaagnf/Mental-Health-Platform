@@ -70,24 +70,28 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id " + id));
 
-        // Validate file
+        // Validate file extension
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || !originalFilename.matches(".*\\.(png|jpg|jpeg)$")) {
             throw new IllegalArgumentException("Only PNG, JPG, or JPEG files are allowed");
         }
 
-        // Create folder if needed
-        String folderPath = "uploads/";
-        new File(folderPath).mkdirs();
+        // Absolute folder path on your disk
+        String folderPath = "C:/Users/HP/Desktop/mental-health-platform/backend/services/userservice/uploads/";
+
+        // Create folder if it does not exist
+        File folder = new File(folderPath);
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
 
         // Remove old picture if exists
         if (user.getProfilePictureUrl() != null) {
             String oldFileName = user.getProfilePictureUrl().replace("/uploads/", "");
-            Path oldFilePath = Paths.get(folderPath + oldFileName);
+            Path oldFilePath = Paths.get(folderPath, oldFileName);
             try {
                 Files.deleteIfExists(oldFilePath);
             } catch (IOException e) {
-                // Log and continue
                 System.err.println("Failed to delete old profile picture: " + e.getMessage());
             }
         }
@@ -95,7 +99,7 @@ public class UserService {
         // Save new file
         String extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
         String filename = "user_" + id + extension;
-        Path filePath = Paths.get(folderPath + filename);
+        Path filePath = Paths.get(folderPath, filename);
 
         try {
             Files.write(filePath, file.getBytes());
@@ -103,7 +107,7 @@ public class UserService {
             throw new RuntimeException("Failed to save file", e);
         }
 
-        // Update user
+        // Save URL as a relative path from your server's root URL mapping
         String imageUrl = "/uploads/" + filename;
         user.setProfilePictureUrl(imageUrl);
         userRepository.save(user);

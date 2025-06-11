@@ -19,6 +19,11 @@ import TherapistDashboard from './pages/dashboard/TherapistDashboard';
 import TherapistProfileEdit from './pages/profile/TherapistProfileEdit';
 import PaymentHistory from './pages/PaymentHistory/PaymentHistory';
 import NotFoundPage from './pages/NotFoundPage';
+import SessionHistoryTherapist from './pages/SessionHistory/SessionHistoryTherapist';
+import SessionHistoryPatient from './pages/SessionHistory/SessionHistoryPatient';
+import LiveSession from './pages/LiveSesssion/LiveSession';
+import AdminLayout from './components/AdminLayout';
+import AdminDashboard from './pages/dashboard/AdminDashboard';
 
 function App() {
   return (
@@ -44,6 +49,9 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="therapists" element={<TherapistListPage />} />
             <Route path="therapists/:id" element={<TherapistDetailPage />} />
+            <Route path="historiqueSeance" element={<SessionHistoryPatient />} />
+            <Route path="LiveSeance" element={<LiveSession />} />
+             <Route path="patientPaymentHistory" element={<PaymentHistory />} />
           </Route>
 
           {/* Therapist Protected Routes */}
@@ -53,8 +61,19 @@ function App() {
             </ProtectedRoute>
           }>
             <Route path="TherapistDashboard" element={<TherapistDashboard />} />
+            <Route path="appointments" element={<AppointmentsPage />} />
+             <Route path="historiqueSeance" element={<SessionHistoryTherapist />} />
             <Route path="TherapistProfile" element={<TherapistProfileEdit />} />
-            <Route path="TherapistPaymentHistory" element={<PaymentHistory />} />
+          </Route>
+
+          {/* Therapist Protected Routes */}
+          <Route path="/admin" element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            
           </Route>
 
           {/* 404 */}

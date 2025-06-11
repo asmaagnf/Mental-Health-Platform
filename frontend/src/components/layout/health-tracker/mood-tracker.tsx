@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Heart, BarChart2 } from "lucide-react"
 import { api, type MoodEntry } from "../../../lib/api"
-import {jwtDecode} from 'jwt-decode';
+import { jwtDecode } from "jwt-decode"
 
 const MOOD_LEVELS = [
   { value: 1, label: "Very Low", color: "bg-red-500", emoji: "😢", gradient: "from-red-500 to-red-400" },
@@ -38,8 +38,6 @@ export default function MoodTracker() {
       } catch (err) {
         console.error("Failed to decode JWT:", err)
       }
-    } else {
-      console.warn("No JWT token found in localStorage.")
     }
   }, [])
 
@@ -53,7 +51,8 @@ export default function MoodTracker() {
     try {
       setLoading(true)
       const entries = await api.getMoodEntries(patientId!)
-      setMoodEntries(entries)
+      const sorted = entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      setMoodEntries(sorted)
     } catch (err) {
       setError("Failed to load mood entries")
       console.error("Error fetching mood entries:", err)
@@ -84,7 +83,9 @@ export default function MoodTracker() {
         date: today,
       })
 
-      setMoodEntries((prev) => [...prev, newEntry])
+      setMoodEntries((prev) =>
+        [...prev, newEntry].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      )
       setMoodNote("")
       setMoodValue(3)
     } catch (err) {
@@ -96,8 +97,7 @@ export default function MoodTracker() {
   }
 
   const getMoodValueFromNiveau = (niveau: string): number => {
-    const found = MOOD_LEVELS.find((m) => m.label.toUpperCase() === niveau.toUpperCase())
-    return found?.value ?? 3
+    return MOOD_LEVELS.find((m) => m.label.toUpperCase() === niveau.toUpperCase())?.value ?? 3
   }
 
   const getMoodMeta = (niveau: string) => {
@@ -123,9 +123,7 @@ export default function MoodTracker() {
             Log Today's Mood
           </h3>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">{error}</div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">{error}</div>}
 
           <form onSubmit={handleMoodSubmit}>
             <div className="mb-8">
@@ -137,7 +135,7 @@ export default function MoodTracker() {
                     type="button"
                     className={`mood-bubble p-4 rounded-2xl transition-all text-center ${
                       moodValue === level.value
-                        ? `bg-gradient-to-br ${level.gradient} text-white selected shadow-lg`
+                        ? `bg-gradient-to-br ${level.gradient} text-white shadow-lg`
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
                     onClick={() => setMoodValue(level.value)}
@@ -157,7 +155,7 @@ export default function MoodTracker() {
                 id="moodNote"
                 rows={4}
                 className="form-textarea"
-                placeholder="What's contributing to your mood today? Any thoughts or experiences you'd like to note..."
+                placeholder="What's contributing to your mood today?"
                 value={moodNote}
                 onChange={(e) => setMoodNote(e.target.value)}
               ></textarea>
@@ -187,46 +185,41 @@ export default function MoodTracker() {
               Mood Journey (Last 7 Days)
             </h3>
 
-            {/* Visualization */}
-            <div className="relative h-80 mb-8 bg-gradient-to-b from-slate-50 to-white rounded-2xl p-6">
+            <div className="relative h-80 mb-8 bg-gradient-to-b from-slate-50 to-white rounded-2xl p-6 overflow-hidden">
               {/* Decorative blur */}
-              <div className="absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="absolute top-4 right-4 w-32 h-32 bg-gradient-to-br from-teal-200/30 to-blue-200/30 rounded-full blur-xl"></div>
-                <div className="absolute bottom-4 left-4 w-24 h-24 bg-gradient-to-br from-purple-200/30 to-pink-200/30 rounded-full blur-xl"></div>
-              </div>
+              <div className="absolute top-4 right-4 w-32 h-32 bg-teal-200/30 rounded-full blur-xl" />
+              <div className="absolute bottom-4 left-4 w-24 h-24 bg-purple-200/30 rounded-full blur-xl" />
 
-              <div className="relative h-full flex items-end justify-between">
-                {moodEntries.slice(-7).map((entry, index) => {
-                  const value = getMoodValueFromNiveau(entry.niveau)
-                  const moodMeta = getMoodMeta(entry.niveau)
-                  const height = value * 15
+              <div className="relative h-full flex items-end justify-between z-10">
+                {[...moodEntries]
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .slice(-7)
+                  .map((entry, index) => {
+                    const value = getMoodValueFromNiveau(entry.niveau)
+                    const moodMeta = getMoodMeta(entry.niveau)
+                    const height = `${value * 30}px` // scaled height
 
-                  return (
-                    <div key={index} className="flex flex-col items-center group cursor-pointer">
-                      <div className="mb-2 text-2xl transform group-hover:scale-125 transition-transform duration-300">
-                        {moodMeta?.emoji}
-                      </div>
-                      <div
-                        className={`w-12 rounded-t-2xl bg-gradient-to-t ${moodMeta?.gradient} shadow-lg group-hover:shadow-xl transition-all duration-500`}
-                        style={{
-                          height: `${height}%`,
-                          minHeight: "20px",
-                        }}
-                      >
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-white font-bold text-sm drop-shadow">{value}</span>
+                    return (
+                      <div key={index} className="flex flex-col items-center group cursor-pointer">
+                        <div className="mb-2 text-2xl group-hover:scale-125 transition-transform">{moodMeta?.emoji}</div>
+                        <div
+                          className={`w-12 rounded-t-2xl bg-gradient-to-t ${moodMeta?.gradient} shadow-lg relative group-hover:shadow-xl transition-all`}
+                          style={{ height }}
+                        >
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-white font-bold text-sm drop-shadow">{value}</span>
+                          </div>
+                        </div>
+                        <div className="text-xs font-medium text-slate-600 mt-3 group-hover:scale-110 transition-transform">
+                          {new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </div>
                       </div>
-                      <div className="text-xs font-medium text-slate-600 mt-3 transform group-hover:scale-110 transition-transform duration-200">
-                        {new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
               </div>
 
               {/* Y-axis */}
-              <div className="absolute left-2 top-6 bottom-6 flex flex-col justify-between">
+              <div className="absolute left-2 top-6 bottom-6 flex flex-col justify-between z-0">
                 {[5, 4, 3, 2, 1].map((value) => (
                   <div key={value} className="flex items-center">
                     <span className="text-xs font-medium text-slate-500 mr-2">{value}</span>
@@ -239,31 +232,36 @@ export default function MoodTracker() {
             {/* Recent Entries */}
             <h4 className="text-lg font-semibold text-slate-900 mb-4">Recent Entries</h4>
             <div className="space-y-3 max-h-60 overflow-y-auto">
-              {[...moodEntries].reverse().slice(0, 5).map((entry, index) => {
-                const moodMeta = getMoodMeta(entry.niveau)
-                return (
-                  <div key={index} className="flex items-start p-4 hover:bg-slate-50 rounded-xl transition-colors">
-                    <div className="flex-shrink-0 mr-4">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${moodMeta?.gradient} flex items-center justify-center text-white text-lg shadow-md`}>
-                        {moodMeta?.emoji}
+              {[...moodEntries]
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 5)
+                .map((entry, index) => {
+                  const moodMeta = getMoodMeta(entry.niveau)
+                  return (
+                    <div key={index} className="flex items-start p-4 hover:bg-slate-50 rounded-xl transition-colors">
+                      <div className="flex-shrink-0 mr-4">
+                        <div
+                          className={`w-12 h-12 rounded-xl bg-gradient-to-br ${moodMeta?.gradient} flex items-center justify-center text-white text-lg shadow-md`}
+                        >
+                          {moodMeta?.emoji}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-slate-900">{moodMeta?.label}</span>
+                          <span className="text-sm text-slate-500">
+                            {new Date(entry.date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600">{entry.note}</p>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-slate-900">{moodMeta?.label}</span>
-                        <span className="text-sm text-slate-500">
-                          {new Date(entry.date).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-600">{entry.note}</p>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </div>
           </div>
         </div>

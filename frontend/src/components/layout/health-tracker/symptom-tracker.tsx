@@ -282,7 +282,7 @@ const symptomPromises = tracked.map(async (symptom: { nom: string }) => {
                     }
 
                     const colorConfig = intensityColors[entry.severity as keyof typeof intensityColors]
-                    const height = entry.severity * 16
+                    const height = `${entry.severity * 30}px`
                     const displayDate = new Date(entry.date).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -292,10 +292,7 @@ const symptomPromises = tracked.map(async (symptom: { nom: string }) => {
                       <div key={index} className="flex flex-col items-center group relative" style={{ flex: "1 1 0%" }}>
                         <div
                           className={`w-8 rounded-t-xl bg-gradient-to-t ${colorConfig.bg} shadow-lg relative overflow-hidden group-hover:scale-110 transition-all duration-500`}
-                          style={{
-                            height: `${height}%`,
-                            minHeight: "16px",
-                          }}
+                          style={{ height }}
                         >
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-white font-bold text-xs drop-shadow-sm">{entry.severity}</span>

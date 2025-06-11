@@ -1,13 +1,34 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {jwtDecode} from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode'
 
 import { BarChart2, Activity, Calendar, Clock, TrendingUp, TrendingDown } from "lucide-react"
 import { api, MoodEntry } from "../../../lib/api"
 
 interface JwtPayload {
-  userId: string // or whatever your JWT uses for patient ID (adjust key if different)
+  userId: string
+}
+
+interface Seance {
+  seanceId: string
+  therapeuteId: string
+  patientId: string
+  dateHeure: string
+  dureeMinutes: number
+  typeSeance: string
+  statutSeance: string
+  lienVisio: string | null
+  urlEnregistrement: string | null
+  noteTherapeute: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface Therapist {
+  id: string
+  name: string
+  
 }
 
 export default function DashboardSummary() {
@@ -16,9 +37,11 @@ export default function DashboardSummary() {
   const [moodTrend, setMoodTrend] = useState<"up" | "down" | "neutral">("neutral")
   const [loading, setLoading] = useState(true)
 
+  const [nextSession, setNextSession] = useState<Seance | null>(null)
+  const [therapistName, setTherapistName] = useState<string>("")
+
   useEffect(() => {
-    // Get JWT from localStorage
-    const token = localStorage.getItem("token") // change key if different
+    const token = localStorage.getItem("token")
     if (!token) {
       console.error("No JWT token found in localStorage")
       setPatientId(null)
@@ -37,6 +60,7 @@ export default function DashboardSummary() {
   useEffect(() => {
     if (!patientId) return
     fetchMoodData()
+    fetchNextSession(patientId)
   }, [patientId])
 
   const fetchMoodData = async () => {
@@ -44,19 +68,14 @@ export default function DashboardSummary() {
       setLoading(true)
       if (!patientId) return
 
-      // Fetch average mood (number)
       const average = await api.getMoodAverage(patientId, 7)
       setMoodAverage(average.toFixed(1))
 
-      // Fetch mood entries array
       const entries: MoodEntry[] = await api.getMoodEntries(patientId)
-      // Take last 7 entries (or fewer if not available)
       const last7Entries = entries.slice(Math.max(0, entries.length - 7))
 
       if (last7Entries.length >= 2) {
         const lastTwo = [last7Entries[last7Entries.length - 1], last7Entries[last7Entries.length - 2]]
-
-        // Parse note as number (assuming note is string representing numeric value)
         const lastNote = parseFloat(lastTwo[0].note)
         const prevNote = parseFloat(lastTwo[1].note)
 
@@ -75,12 +94,50 @@ export default function DashboardSummary() {
     }
   }
 
+  const fetchNextSession = async (patientId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8070/api/seances/patient/${patientId}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch sessions")
+      }
+      const sessions: Seance[] = await response.json()
+
+      // Filter only future sessions and non-cancelled ones
+      const now = new Date()
+      const upcomingSessions = sessions
+        .filter(s => new Date(s.dateHeure) > now && s.statutSeance !== "ANNULEE")
+        .sort((a, b) => new Date(a.dateHeure).getTime() - new Date(b.dateHeure).getTime())
+
+      if (upcomingSessions.length === 0) {
+        setNextSession(null)
+        setTherapistName("")
+        return
+      }
+
+      const next = upcomingSessions[0]
+      setNextSession(next)
+
+      // Fetch therapist info
+      const therapistResp = await fetch(`http://localhost:8090/api/user/${next.therapeuteId}`)
+      if (!therapistResp.ok) {
+        throw new Error("Failed to fetch therapist info")
+      }
+      const therapist: Therapist = await therapistResp.json()
+      setTherapistName(`${therapist.name}`)
+    } catch (error) {
+      console.error("Error fetching next session:", error)
+      setNextSession(null)
+      setTherapistName("")
+    }
+  }
+
   if (!patientId) {
     return <div className="text-center p-6 text-red-500">No valid user session found.</div>
   }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Mood Average */}
       <div className="card p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-teal-500/20 to-transparent rounded-full -mr-10 -mt-10"></div>
         <div className="flex items-center justify-between mb-4">
@@ -106,6 +163,7 @@ export default function DashboardSummary() {
         <p className="text-sm text-slate-500 mt-2">Based on your last 7 entries</p>
       </div>
 
+      {/* Symptom Trend */}
       <div className="card p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/20 to-transparent rounded-full -mr-10 -mt-10"></div>
         <div className="flex items-center justify-between mb-4">
@@ -120,6 +178,7 @@ export default function DashboardSummary() {
         <p className="text-sm text-slate-500 mt-2">Symptoms overall stable</p>
       </div>
 
+      {/* Next Session */}
       <div className="card p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/20 to-transparent rounded-full -mr-10 -mt-10"></div>
         <div className="flex items-center justify-between mb-4">
@@ -128,12 +187,30 @@ export default function DashboardSummary() {
             <Calendar className="h-6 w-6 text-white" />
           </div>
         </div>
-        <div className="text-xl font-medium text-slate-900">May 15, 2023</div>
-        <div className="flex items-center mt-1">
-          <Clock className="h-4 w-4 text-slate-400 mr-1" />
-          <span className="text-slate-600">10:00 AM with Dr. Johnson</span>
-        </div>
-        <button className="btn btn-outline text-sm mt-3 w-full">View Details</button>
+        {nextSession ? (
+          <>
+            <div className="text-xl font-medium text-slate-900">
+              {new Date(nextSession.dateHeure).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+            <div className="flex items-center mt-1">
+              <Clock className="h-4 w-4 text-slate-400 mr-1" />
+              <span className="text-slate-600">
+                {new Date(nextSession.dateHeure).toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                with {therapistName || "Therapist"}
+              </span>
+            </div>
+            <button className="btn btn-outline text-sm mt-3 w-full">View Details</button>
+          </>
+        ) : (
+          <div className="text-slate-500">No upcoming sessions</div>
+        )}
       </div>
     </div>
   )
