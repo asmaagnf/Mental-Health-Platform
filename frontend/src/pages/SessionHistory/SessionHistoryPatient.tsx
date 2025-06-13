@@ -1,17 +1,79 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, Video, User, Star } from 'lucide-react';
-import { getSessionsByPatient, getUserById } from '../../data/mockData';
 import { SessionType, SessionStatus } from '../../types/entities';
+import axios from 'axios';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string | null;
+  address: string;
+  gender: string;
+  role: string;
+  profilePictureUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Session {
+  seanceId: string;
+  therapeuteId: string;
+  patientId: string;
+  dateHeure: string;
+  dureeMinutes: number;
+  typeSeance: SessionType;
+  statutSeance: SessionStatus;
+  lienVisio: string | null;
+  urlEnregistrement: string | null;
+  noteTherapeute: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 const SessionHistoryPatient: React.FC = () => {
-  const sessions = getSessionsByPatient('2'); // Current patient ID
-  const completedSessions = sessions.filter(session => session.statutSeance === 'TERMINÉE');
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [therapists, setTherapists] = useState<Record<string, User>>({});
+  
+  const user = JSON.parse(localStorage.getItem("user") || '{}');
+  const userId = user?.id;
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const response = await axios.get(`http://localhost:8070/api/seances/patient/${userId}`);
+        const completedSessions = response.data.filter((session: Session) => session.statutSeance === 'TERMINEE');
+        setSessions(completedSessions);
+        
+        // Fetch therapist info for each session
+        const therapistIds = [...new Set(completedSessions.map((session: Session) => session.therapeuteId))];
+        const therapistsData: Record<string, User> = {};
+        
+        for (const id of therapistIds) {
+          const therapistResponse = await axios.get(`http://localhost:8090/api/user/${id}`);
+          therapistsData[id] = therapistResponse.data;
+        }
+        
+        setTherapists(therapistsData);
+      } catch (error) {
+        console.error('Error fetching sessions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchSessions();
+    }
+  }, [userId]);
 
   const getStatusBadge = (status: SessionStatus) => {
     const styles = {
-      'TERMINÉE': 'bg-green-100 text-green-800',
-      'PLANIFIÉE': 'bg-blue-100 text-blue-800',
-      'ANNULÉE': 'bg-red-100 text-red-800'
+      'TERMINEE': 'bg-green-100 text-green-800',
+      'PLANIFIEE': 'bg-blue-100 text-blue-800',
+      'ANNULEE': 'bg-red-100 text-red-800'
     };
     
     return (
@@ -27,6 +89,16 @@ const SessionHistoryPatient: React.FC = () => {
       <MapPin className="w-4 h-4 text-blue-500" />;
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -35,8 +107,9 @@ const SessionHistoryPatient: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {completedSessions.map((session) => {
-          const therapist = getUserById(session.therapeuteId);
+        {sessions.map((session) => {
+          const therapist = therapists[session.therapeuteId];
+          const sessionDate = new Date(session.dateHeure);
           
           return (
             <div key={session.seanceId} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
@@ -45,8 +118,8 @@ const SessionHistoryPatient: React.FC = () => {
                   <div className="flex items-center space-x-4">
                     <div className="relative">
                       <img
-                        src={therapist?.photoProfilUrl || 'https://images.pexels.com/photos/5327647/pexels-photo-5327647.jpeg?auto=compress&cs=tinysrgb&w=400'}
-                        alt={therapist?.nom}
+                        src={`http://localhost:8090${therapist?.profilePictureUrl}` || 'https://images.pexels.com/photos/5327647/pexels-photo-5327647.jpeg?auto=compress&cs=tinysrgb&w=400'}
+                        alt={therapist?.name}
                         className="w-12 h-12 rounded-full object-cover"
                       />
                       <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1">
@@ -56,16 +129,16 @@ const SessionHistoryPatient: React.FC = () => {
                     <div>
                       <h3 className="font-semibold text-slate-900 flex items-center space-x-2">
                         <User className="w-4 h-4 text-slate-400" />
-                        <span>{therapist?.nom}</span>
+                        <span>{therapist?.name}</span>
                       </h3>
                       <div className="flex items-center space-x-4 text-sm text-slate-500 mt-1">
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{session.dateHeure.toLocaleDateString('fr-FR')}</span>
+                          <span>{sessionDate.toLocaleDateString('fr-FR')}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock className="w-4 h-4" />
-                          <span>{session.dateHeure.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>{sessionDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <span className="text-slate-400">•</span>
                         <span>{session.dureeMinutes} min</span>
@@ -98,7 +171,7 @@ const SessionHistoryPatient: React.FC = () => {
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                   <div className="text-sm text-slate-500">
-                    Séance terminée le {session.dateHeure.toLocaleDateString('fr-FR')}
+                    Séance terminée le {sessionDate.toLocaleDateString('fr-FR')}
                   </div>
                   <button className="flex items-center space-x-1 text-teal-600 hover:text-teal-700 text-sm font-medium transition-colors">
                     <Star className="w-4 h-4" />
@@ -111,7 +184,7 @@ const SessionHistoryPatient: React.FC = () => {
         })}
       </div>
 
-      {completedSessions.length === 0 && (
+      {sessions.length === 0 && (
         <div className="text-center py-12">
           <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900 mb-2">Aucune séance terminée</h3>

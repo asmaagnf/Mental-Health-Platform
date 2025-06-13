@@ -1,62 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, Star, MapPin, Calendar } from 'lucide-react';
+import axios from 'axios';
 
-// Mock data for therapists
-const MOCK_THERAPISTS = [
-  {
-    id: 1,
-    name: "Dr. Sarah Johnson",
-    specialty: "Anxiety & Depression",
-    rating: 4.8,
-    reviews: 124,
-    location: "New York, NY",
-    availableToday: true,
-    education: "Ph.D. in Clinical Psychology",
-    experience: "12 years",
-    price: "$120",
-    image: "https://images.pexels.com/photos/5327585/pexels-photo-5327585.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  },
-  {
-    id: 2,
-    name: "Dr. Michael Rodriguez",
-    specialty: "Trauma & PTSD",
-    rating: 4.9,
-    reviews: 89,
-    location: "Chicago, IL",
-    availableToday: false,
-    education: "Psy.D. in Clinical Psychology",
-    experience: "8 years",
-    price: "$150",
-    image: "https://images.pexels.com/photos/5326953/pexels-photo-5326953.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  },
-  {
-    id: 3,
-    name: "Dr. Emily Chen",
-    specialty: "Relationship Issues",
-    rating: 4.7,
-    reviews: 156,
-    location: "San Francisco, CA",
-    availableToday: true,
-    education: "Ph.D. in Psychology",
-    experience: "15 years",
-    price: "$135",
-    image: "https://images.pexels.com/photos/5407206/pexels-photo-5407206.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  },
-  {
-    id: 4,
-    name: "Dr. James Wilson",
-    specialty: "Stress Management",
-    rating: 4.6,
-    reviews: 72,
-    location: "Boston, MA",
-    availableToday: true,
-    education: "Ph.D. in Counseling Psychology",
-    experience: "10 years",
-    price: "$110",
-    image: "https://images.pexels.com/photos/5490276/pexels-photo-5490276.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-  }
-];
+interface Diploma {
+  title: string;
+  institution: string;
+  year: number;
+  imageUrl: string | null;
+}
+
+interface Therapist {
+  id: string;
+  userId: string;
+  specialites: string[];
+  description: string;
+  anneesExperience: number;
+  diplomas: Diploma[];
+  languesParlees: string[];
+  localisation: string;
+  available: boolean;
+  prixParHeure: number;
+  statutProfil: string;
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string | null;
+  address: string | null;
+  gender: string;
+  role: string;
+  profilePictureUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CombinedTherapist extends Therapist {
+  user: User;
+}
 
 const TherapistListPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +50,40 @@ const TherapistListPage: React.FC = () => {
     priceRange: ''
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [therapists, setTherapists] = useState<CombinedTherapist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchTherapists = async () => {
+      try {
+        // Fetch therapists
+        const therapistsRes = await axios.get('http://localhost:8040/api/therapeutes/profiles/all/valides');
+        
+        // Fetch user data for each therapist
+        const combinedTherapists = await Promise.all(
+          therapistsRes.data.map(async (therapist: Therapist) => {
+            try {
+              const userRes = await axios.get(`http://localhost:8090/api/user/${therapist.userId}`);
+              return { ...therapist, user: userRes.data };
+            } catch (userError) {
+              console.error(`Error fetching user ${therapist.userId}:`, userError);
+              return { ...therapist, user: null };
+            }
+          })
+        );
+        
+        setTherapists(combinedTherapists);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to load therapists. Please try again later.');
+        setLoading(false);
+        console.error('Error fetching therapists:', err);
+      }
+    };
+    
+    fetchTherapists();
+  }, []);
   
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -78,33 +96,62 @@ const TherapistListPage: React.FC = () => {
   };
   
   // Filter therapists based on search and filters
-  const filteredTherapists = MOCK_THERAPISTS.filter(therapist => {
+  const filteredTherapists = therapists.filter(therapist => {
     // Search term filter
-    if (searchTerm && !therapist.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
-        !therapist.specialty.toLowerCase().includes(searchTerm.toLowerCase())) {
+    if (searchTerm && 
+        !therapist.user?.name.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
     
     // Specialty filter
-    if (filters.specialty && therapist.specialty !== filters.specialty) {
+    if (filters.specialty && 
+        !therapist.specialites.some(s => s.toLowerCase().includes(filters.specialty.toLowerCase()))) {
       return false;
     }
     
     // Available today filter
-    if (filters.availableToday && !therapist.availableToday) {
+    if (filters.availableToday && !therapist.available) {
       return false;
     }
     
     // Price range filter
     if (filters.priceRange) {
-      const price = parseInt(therapist.price.replace('$', ''));
-      if (filters.priceRange === 'under100' && price >= 100) return false;
-      if (filters.priceRange === '100-150' && (price < 100 || price > 150)) return false;
-      if (filters.priceRange === 'over150' && price <= 150) return false;
+      if (filters.priceRange === 'under100' && therapist.prixParHeure >= 100) return false;
+      if (filters.priceRange === '100-150' && (therapist.prixParHeure < 100 || therapist.prixParHeure > 150)) return false;
+      if (filters.priceRange === 'over150' && therapist.prixParHeure <= 150) return false;
     }
     
     return true;
   });
+  
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
@@ -125,7 +172,7 @@ const TherapistListPage: React.FC = () => {
             <input
               type="text"
               className="block w-full pl-10 form-input"
-              placeholder="Search by name or specialty..."
+              placeholder="Search by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -145,19 +192,15 @@ const TherapistListPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="specialty" className="form-label">Specialty</label>
-                <select
+                <input
+                  type="text"
                   id="specialty"
                   name="specialty"
                   className="form-input"
+                  placeholder="Filter by specialty..."
                   value={filters.specialty}
                   onChange={handleFilterChange}
-                >
-                  <option value="">All Specialties</option>
-                  <option value="Anxiety & Depression">Anxiety & Depression</option>
-                  <option value="Trauma & PTSD">Trauma & PTSD</option>
-                  <option value="Relationship Issues">Relationship Issues</option>
-                  <option value="Stress Management">Stress Management</option>
-                </select>
+                />
               </div>
               
               <div>
@@ -170,9 +213,9 @@ const TherapistListPage: React.FC = () => {
                   onChange={handleFilterChange}
                 >
                   <option value="">Any Price</option>
-                  <option value="under100">Under $100</option>
-                  <option value="100-150">$100 - $150</option>
-                  <option value="over150">Over $150</option>
+                  <option value="under100">Under 100 DH</option>
+                  <option value="100-150">100 DH - 150 DH</option>
+                  <option value="over150">Over 150 DH</option>
                 </select>
               </div>
               
@@ -202,47 +245,49 @@ const TherapistListPage: React.FC = () => {
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-1/4">
                   <img 
-                    src={therapist.image} 
-                    alt={therapist.name} 
+                    src={therapist.user?.profilePictureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80"} 
+                    alt={therapist.user?.name} 
                     className="w-full h-48 md:h-full object-cover object-center"
                   />
                 </div>
                 <div className="flex-1 p-6">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-900">{therapist.name}</h2>
-                      <p className="text-teal-600 font-medium">{therapist.specialty}</p>
+                      <h2 className="text-2xl font-bold text-slate-900">{therapist.user?.name}</h2>
+                      <p className="text-teal-600 font-medium">
+                        {therapist.specialites.join(', ')}
+                      </p>
                     </div>
                     <div className="flex items-center">
                       <Star className="h-5 w-5 text-yellow-500 fill-current" />
-                      <span className="ml-1 font-medium">{therapist.rating}</span>
-                      <span className="text-slate-500 ml-1">({therapist.reviews} reviews)</span>
+                      <span className="ml-1 font-medium">4.5</span>
+                      <span className="text-slate-500 ml-1">(12 reviews)</span>
                     </div>
                   </div>
                   
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex items-center text-slate-600">
                       <MapPin className="h-5 w-5 mr-2 text-slate-400" />
-                      {therapist.location}
+                      {therapist.localisation}
                     </div>
                     <div className="flex items-center text-slate-600">
                       <Calendar className="h-5 w-5 mr-2 text-slate-400" />
-                      {therapist.availableToday ? (
+                      {therapist.available ? (
                         <span className="text-green-600 font-medium">Available today</span>
                       ) : (
                         <span>Not available today</span>
                       )}
                     </div>
                     <div className="text-slate-600">
-                      <span className="font-medium">Education:</span> {therapist.education}
+                      <span className="font-medium">Experience:</span> {therapist.anneesExperience} years
                     </div>
                     <div className="text-slate-600">
-                      <span className="font-medium">Experience:</span> {therapist.experience}
+                      <span className="font-medium">Languages:</span> {therapist.languesParlees.join(', ')}
                     </div>
                   </div>
                   
                   <div className="mt-6 flex justify-between items-center">
-                    <div className="text-xl font-bold text-slate-900">{therapist.price} <span className="text-slate-500 text-base font-normal">/ session</span></div>
+                    <div className="text-xl font-bold text-slate-900">{therapist.prixParHeure} DH <span className="text-slate-500 text-base font-normal">/ session</span></div>
                     <div className="flex gap-3">
                       <Link 
                         to={`/therapists/${therapist.id}`}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef,useState } from 'react';
 import { X, Mic, MicOff, Video as VideoIcon, VideoOff } from 'lucide-react';
 
 interface VideoCallProps {
@@ -54,7 +54,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ roomName, displayName, onLeave })
 
       const api = new window.JitsiMeetExternalAPI(domain, options);
 
-      api.executeCommand('subject', 'Session Thérapeutique');
+      api.executeCommand('subject', 'Therapy Session');
 
       // Event handlers
       api.on('readyToClose', () => {

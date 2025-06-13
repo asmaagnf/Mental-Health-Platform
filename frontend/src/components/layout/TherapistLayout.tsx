@@ -23,6 +23,8 @@ const TherapistLayout = () => {
               <NavLink to="/therapist/TherapistDashboard" className={({ isActive }) => navStyle(isActive)}>Dashboard</NavLink>
              <NavLink to="/therapist/appointments" className={({ isActive }) => navStyle(isActive)}>Appointments</NavLink>
              <NavLink to="/therapist/historiqueSeance" className={({ isActive }) => navStyle(isActive)}>historiqueSeance</NavLink>
+            <NavLink to="/therapist/LiveSeance" className={({ isActive }) => navStyle(isActive)}>LiveSeance</NavLink> 
+            <NavLink to="/therapist/patientPaymentHistory" className={({ isActive }) => navStyle(isActive)}>Payments</NavLink>
               <NavLink to="/therapist/TherapistProfile" className={({ isActive }) => navStyle(isActive)}>Profile</NavLink>
               <button
                 onClick={handleLogout}

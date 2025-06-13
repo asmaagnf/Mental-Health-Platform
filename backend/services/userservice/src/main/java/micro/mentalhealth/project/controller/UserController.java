@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -41,12 +42,26 @@ public class UserController {
     }
 
     @PostMapping("/{id}/upload-profile-picture")
-    public ResponseEntity<String> uploadProfilePicture(
+    public ResponseEntity<Map<String, String>> uploadProfilePicture(
             @PathVariable UUID id,
             @RequestParam("file") MultipartFile file) {
 
-        String imageUrl = userService.saveProfilePicture(id, file);
-        return ResponseEntity.ok(imageUrl);
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+        }
+
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed"));
+        }
+
+        try {
+            String imageUrl = userService.saveProfilePicture(id, file);
+            return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/all")

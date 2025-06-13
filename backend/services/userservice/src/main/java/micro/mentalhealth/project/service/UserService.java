@@ -18,7 +18,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import java.io.File;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -66,48 +68,52 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    public String saveProfilePicture(UUID id, MultipartFile file) {
+    public String saveProfilePicture(UUID id, MultipartFile file) throws IOException {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id " + id));
 
-        // Validate file extension
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || !originalFilename.matches(".*\\.(png|jpg|jpeg)$")) {
-            throw new IllegalArgumentException("Only PNG, JPG, or JPEG files are allowed");
+        // Validate file
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File is empty");
         }
 
-        // Absolute folder path on your disk
-        String folderPath = "C:/Users/HP/Desktop/mental-health-platform/backend/services/userservice/uploads/";
-
-        // Create folder if it does not exist
-        File folder = new File(folderPath);
-        if (!folder.exists()) {
-            folder.mkdirs();
+        // Validate content type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("Only image files are allowed");
         }
 
-        // Remove old picture if exists
-        if (user.getProfilePictureUrl() != null) {
-            String oldFileName = user.getProfilePictureUrl().replace("/uploads/", "");
-            Path oldFilePath = Paths.get(folderPath, oldFileName);
+        // Configure upload directory (use system property or environment variable)
+        String uploadDir = System.getProperty("user.uploads.dir",
+                "C:/Users/HP/Desktop/mental-health-platform/backend/services/userservice/uploads/");
+
+        // Create directory if it doesn't exist
+        Path uploadPath = Paths.get(uploadDir);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+
+        // Delete old picture if exists
+        if (user.getProfilePictureUrl() != null && !user.getProfilePictureUrl().isEmpty()) {
             try {
+                String oldFileName = user.getProfilePictureUrl().substring(user.getProfilePictureUrl().lastIndexOf('/') + 1);
+                Path oldFilePath = uploadPath.resolve(oldFileName);
                 Files.deleteIfExists(oldFilePath);
             } catch (IOException e) {
-                System.err.println("Failed to delete old profile picture: " + e.getMessage());
+                throw new RuntimeException("Unable to delete old profile picture", e);
             }
         }
 
-        // Save new file
-        String extension = originalFilename.substring(originalFilename.lastIndexOf('.'));
-        String filename = "user_" + id + extension;
-        Path filePath = Paths.get(folderPath, filename);
+        // Generate unique filename
+        String extension = Objects.requireNonNull(file.getOriginalFilename())
+                .substring(file.getOriginalFilename().lastIndexOf('.'));
+        String filename = "user_" + id + "_" + System.currentTimeMillis() + extension;
+        Path filePath = uploadPath.resolve(filename);
 
-        try {
-            Files.write(filePath, file.getBytes());
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to save file", e);
-        }
+        // Save file
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        // Save URL as a relative path from your server's root URL mapping
+        // Store relative URL
         String imageUrl = "/uploads/" + filename;
         user.setProfilePictureUrl(imageUrl);
         userRepository.save(user);

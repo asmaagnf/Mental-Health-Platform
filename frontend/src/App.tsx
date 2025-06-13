@@ -27,6 +27,8 @@ import AdminDashboard from './pages/dashboard/AdminDashboard';
 import CreerTherapistProfile from './pages/profile/CreerTherapistProfile';
 import PendingPage from './pages/ProfileRed/PendingPage';
 import RefusedPage from './pages/ProfileRed/RefusedPage ';
+import TherapistSessionList from './pages/LiveSesssion/TherapistSessionList';
+import PatientSessionList from './pages/LiveSesssion/PatientSessionList';
 
 function App() {
   return (
@@ -57,7 +59,7 @@ function App() {
             <Route path="therapists" element={<TherapistListPage />} />
             <Route path="therapists/:id" element={<TherapistDetailPage />} />
             <Route path="historiqueSeance" element={<SessionHistoryPatient />} />
-            <Route path="LiveSeance" element={<LiveSession />} />
+            <Route path="LiveSeance" element={<PatientSessionList />} />
              <Route path="patientPaymentHistory" element={<PaymentHistory />} />
           </Route>
 
@@ -70,7 +72,9 @@ function App() {
             <Route path="TherapistDashboard" element={<TherapistDashboard />} />
             <Route path="appointments" element={<AppointmentsPage />} />
              <Route path="historiqueSeance" element={<SessionHistoryTherapist />} />
+             <Route path="LiveSeance" element={<TherapistSessionList />} />
             <Route path="TherapistProfile" element={<TherapistProfileEdit />} />
+            <Route path="patientPaymentHistory" element={<PaymentHistory />} />
           </Route>
 
           {/* Therapist Protected Routes */}

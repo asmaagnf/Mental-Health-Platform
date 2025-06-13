@@ -127,6 +127,7 @@ public class SeanceService {
 
         return true; // Pas de conflit et dans plage dispo
     }
+    @Transactional
     public SeanceDTO createPendingSeance(UUID therapistId, UUID patientId, LocalDateTime dateTime, int dureeMinutes, TypeSeance typeSeance) {
         System.out.println("Checking therapist availability...");
         if (!isTherapistAvailable(therapistId, dateTime, dureeMinutes)) {
@@ -142,11 +143,12 @@ public class SeanceService {
                 .typeSeance(typeSeance)
                 .statutSeance(StatutSeance.EN_ATTENTE_PAIEMENT) // waiting payment
                 .build();
-        if (typeSeance == TypeSeance.EN_LIGNE) {
-            seance.setLienVisio(new LienVisio("https://meet.jit.si/seance-" + seance.getSeanceId()));
-        }
         System.out.println("Saving seance to repository...");
         Seance saved = seanceRepository.save(seance);
+        if (typeSeance == TypeSeance.EN_LIGNE) {
+            saved.setLienVisio(new LienVisio("https://meet.jit.si/seance-" + saved.getSeanceId()));
+            saved = seanceRepository.save(saved); // save again to persist the link
+        }
         System.out.println("Seance saved with id: " + saved.getSeanceId());
         return seanceMapper.toDTO(saved);
     }
