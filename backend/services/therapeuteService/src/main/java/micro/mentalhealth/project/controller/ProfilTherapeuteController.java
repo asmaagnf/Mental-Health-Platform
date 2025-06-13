@@ -1,76 +1,132 @@
 package micro.mentalhealth.project.controller;
 
-import lombok.RequiredArgsConstructor;
-import micro.mentalhealth.project.dto.ProfilTherapeuteDTO;
-import micro.mentalhealth.project.model.StatutTherapeute;
+import jakarta.persistence.EntityNotFoundException;
+import micro.mentalhealth.project.dto.profiltherapeute.ProfilTherapeuteRequest;
+import micro.mentalhealth.project.dto.profiltherapeute.ProfilTherapeuteResponse;
 import micro.mentalhealth.project.service.ProfilTherapeuteService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/therapeutes")
-@RequiredArgsConstructor
+@RequestMapping("/api/therapeutes/profiles")
+@Validated
 public class ProfilTherapeuteController {
 
-    private final ProfilTherapeuteService service;
+    private final ProfilTherapeuteService profilTherapeuteService;
 
-    @PostMapping
-    public ResponseEntity<ProfilTherapeuteDTO> createProfil(@RequestBody ProfilTherapeuteDTO dto) {
-        ProfilTherapeuteDTO created = service.createProfil(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    @Autowired
+    public ProfilTherapeuteController(ProfilTherapeuteService profilTherapeuteService) {
+        this.profilTherapeuteService = profilTherapeuteService;
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ProfilTherapeuteDTO> updateProfil(@PathVariable UUID id, @RequestBody ProfilTherapeuteDTO dto) {
-        ProfilTherapeuteDTO updated = service.updateProfil(id, dto);
-        return ResponseEntity.ok(updated);
+    @PostMapping("/initial-create/{userId}")
+    public ResponseEntity<ProfilTherapeuteResponse> createInitialProfil(
+            @PathVariable UUID userId,
+            @Valid @RequestBody ProfilTherapeuteRequest request) {
+        try {
+            ProfilTherapeuteResponse response = profilTherapeuteService.createInitialProfil(userId, request);
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(null, HttpStatus.CONFLICT);
+        }
     }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<ProfilTherapeuteDTO> getProfil(@PathVariable UUID id) {
-        ProfilTherapeuteDTO profil = service.getById(id);
-        return ResponseEntity.ok(profil);
+    // New endpoint for uploading diploma images
+    @PostMapping("/{userId}/diplomas/upload")
+    public ResponseEntity<String> uploadDiplomaImage(
+            @PathVariable UUID userId,
+            @RequestParam("diplomaTitle") String diplomaTitle,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            String imageUrl = profilTherapeuteService.uploadDiplomaImage(userId, diplomaTitle, file);
+            return new ResponseEntity<>(imageUrl, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
-
-    @PutMapping("/{id}/statut")
-    public ResponseEntity<Void> changerStatut(@PathVariable UUID id, @RequestParam StatutTherapeute statut) {
-        service.changerStatut(id, statut);
-        return ResponseEntity.noContent().build();  // 204 No Content
+    @GetMapping("/all/valides")
+    public ResponseEntity<List<ProfilTherapeuteResponse>> getProfilsValides() {
+        List<ProfilTherapeuteResponse> responses = profilTherapeuteService.getProfilsByStatutValide();
+        return new ResponseEntity<>(responses, HttpStatus.OK);
     }
-
-    @PutMapping("/{id}/localisation")
-    public ResponseEntity<Void> updateLocalisation(@PathVariable UUID id, @RequestParam String adresse) {
-        service.updateLocalisation(id, adresse);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/certifications")
-    public ResponseEntity<Void> ajouterCertification(@PathVariable UUID id, @RequestParam MultipartFile file) throws IOException {
-        service.addCertification(id, file);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
-
     @GetMapping
-    public ResponseEntity<List<ProfilTherapeuteDTO>> getAll() {
-        List<ProfilTherapeuteDTO> profils = service.getAllProfils();
-        return ResponseEntity.ok(profils);
+    public ResponseEntity<List<ProfilTherapeuteResponse>> getAllProfils() {
+        List<ProfilTherapeuteResponse> responses = profilTherapeuteService.getAllProfils();
+        return new ResponseEntity<>(responses, HttpStatus.OK);
+    }
+    @PutMapping("/{userId}")
+    public ResponseEntity<ProfilTherapeuteResponse> updateProfil(@PathVariable UUID userId,
+                                                                 @Valid @RequestBody ProfilTherapeuteRequest request) {
+        try {
+            ProfilTherapeuteResponse response = profilTherapeuteService.updateProfil(userId, request);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
-    @GetMapping("/statut")
-    public ResponseEntity<List<ProfilTherapeuteDTO>> getByStatut(@RequestParam StatutTherapeute statut) {
-        List<ProfilTherapeuteDTO> profils = service.getByStatut(statut);
-        return ResponseEntity.ok(profils);
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ProfilTherapeuteResponse> getProfilByUserId(@PathVariable UUID userId) {
+        try {
+            ProfilTherapeuteResponse response = profilTherapeuteService.getProfilByUserId(userId);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteProfil(@PathVariable UUID id) {
-        service.deleteProfil(id);
-        return ResponseEntity.noContent().build();
+    @GetMapping("/{userId}/price")
+    public ResponseEntity<Double> getPrixParHeureByUserId(@PathVariable UUID userId) {
+        try {
+            Double prixParHeure = profilTherapeuteService.getPrixParHeureByUserId(userId);
+            return new ResponseEntity<>(prixParHeure, HttpStatus.OK);
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @GetMapping("/{profilId}")
+    public ResponseEntity<ProfilTherapeuteResponse> getProfilById(@PathVariable UUID profilId) {
+        try {
+            ProfilTherapeuteResponse response = profilTherapeuteService.getProfilById(profilId);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        }
+    }
+
+
+    @PutMapping("/{profilId}/validate")
+    public ResponseEntity<ProfilTherapeuteResponse> validateProfil(@PathVariable UUID profilId) {
+        try {
+            ProfilTherapeuteResponse response = profilTherapeuteService.validateProfil(profilId);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PutMapping("/{profilId}/reject")
+    public ResponseEntity<ProfilTherapeuteResponse> rejectProfil(@PathVariable UUID profilId,
+                                                                 @RequestParam(required = false) String reason) {
+        try {
+            ProfilTherapeuteResponse response = profilTherapeuteService.rejectProfil(profilId, reason);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (EntityNotFoundException e) {
+            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+        }
     }
 }

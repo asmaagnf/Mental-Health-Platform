@@ -1,55 +1,66 @@
 package micro.mentalhealth.project.mapper;
 
-import micro.mentalhealth.project.dto.ProfilTherapeuteDTO;
-import micro.mentalhealth.project.model.Certification;
 import micro.mentalhealth.project.model.ProfilTherapeute;
+import micro.mentalhealth.project.model.valueobjects.StatutProfil;
+import micro.mentalhealth.project.dto.profiltherapeute.ProfilTherapeuteRequest;
+import micro.mentalhealth.project.dto.profiltherapeute.ProfilTherapeuteResponse;
+import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.Base64;
-import java.util.Collections;
+import java.util.UUID;
+import java.util.List;
 import java.util.stream.Collectors;
 
+@Component
 public class ProfilTherapeuteMapper {
 
-    public static ProfilTherapeuteDTO toDto(ProfilTherapeute profil) {
-        return ProfilTherapeuteDTO.builder()
-                .id(profil.getId())
-                .utilisateurId(profil.getUtilisateurId())
-                .specialites(profil.getSpecialites())
-                .languesParlees(profil.getLanguesParlees())
-                .localisation(profil.getLocalisation())
-                .certificationsBase64(
-                        profil.getCertifications() != null ?
-                                profil.getCertifications().stream()
-                                        .map(cert -> Base64.getEncoder().encodeToString(cert.getFile())) // note .getFile()
-                                        .collect(Collectors.toList()) :
-                                Collections.emptyList()
-                )
-                .anneesExperience(profil.getAnneesExperience())
-                .statut(profil.getStatut())
-                .prixParHeure(profil.getPrixParHeure())
-                .createdAt(profil.getCreatedAt())
-                .validatedAt(profil.getValidatedAt())
-                .build();
+    private final DiplomaMapper diplomaMapper;
+
+    @Autowired
+    public ProfilTherapeuteMapper(DiplomaMapper diplomaMapper) {
+        this.diplomaMapper = diplomaMapper;
     }
 
-    public static ProfilTherapeute toEntity(ProfilTherapeuteDTO dto) {
-        return ProfilTherapeute.builder()
-                .id(dto.getId())
-                .utilisateurId(dto.getUtilisateurId())
-                .specialites(dto.getSpecialites())
-                .languesParlees(dto.getLanguesParlees())
-                .localisation(dto.getLocalisation())
-                .certifications(
-                        dto.getCertificationsBase64() != null ?
-                                dto.getCertificationsBase64().stream()
-                                        .map(base64 -> new Certification(Base64.getDecoder().decode(base64))) // map to Certification
-                                        .collect(Collectors.toList()) :
-                                Collections.emptyList())
-                .anneesExperience(dto.getAnneesExperience())
-                .statut(dto.getStatut())
-                .prixParHeure(dto.getPrixParHeure())
-                .createdAt(dto.getCreatedAt())
-                .validatedAt(dto.getValidatedAt())
-                .build();
+    public ProfilTherapeute toEntity(ProfilTherapeuteRequest dto) {
+        if (dto == null) {
+            return null;
+        }
+        ProfilTherapeute entity = new ProfilTherapeute();
+        entity.setSpecialites(dto.getSpecialites());
+        entity.setDescription(dto.getDescription());
+        entity.setAnneesExperience(dto.getAnneesExperience());
+        entity.setDiplomas(diplomaMapper.toEntityList(dto.getDiplomas()));
+        entity.setLanguesParlees(dto.getLanguesParlees());
+        entity.setLocalisation(dto.getLocalisation());
+        entity.setAvailable(dto.getAvailable());
+        entity.setPrixParHeure(dto.getPrixParHeure());
+        // StatutProfil is set by service logic, not from request directly
+        return entity;
+    }
+
+    public ProfilTherapeuteResponse toDto(ProfilTherapeute entity) {
+        if (entity == null) {
+            return null;
+        }
+        return new ProfilTherapeuteResponse(
+                entity.getId() != null ? entity.getId() : null,
+                entity.getUserId(),
+                entity.getSpecialites(),
+                entity.getDescription(),
+                entity.getAnneesExperience(),
+                diplomaMapper.toDtoList(entity.getDiplomas()),
+                entity.getLanguesParlees(),
+                entity.getLocalisation(),
+                entity.getAvailable(),
+                entity.getPrixParHeure(),
+                entity.getStatutProfil()
+        );
+    }
+
+    public List<ProfilTherapeuteResponse> toDtoList(List<ProfilTherapeute> entityList) {
+        if (entityList == null) {
+            return null;
+        }
+        return entityList.stream().map(this::toDto).collect(Collectors.toList());
     }
 }

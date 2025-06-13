@@ -24,6 +24,9 @@ import SessionHistoryPatient from './pages/SessionHistory/SessionHistoryPatient'
 import LiveSession from './pages/LiveSesssion/LiveSession';
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
+import CreerTherapistProfile from './pages/profile/CreerTherapistProfile';
+import PendingPage from './pages/ProfileRed/PendingPage';
+import RefusedPage from './pages/ProfileRed/RefusedPage ';
 
 function App() {
   return (
@@ -37,6 +40,10 @@ function App() {
           <Route path="/register" element={<PublicLayout><RegisterPage /></PublicLayout>} />
           <Route path="/therapists" element={<PublicLayout><TherapistListPage /></PublicLayout>} />
           <Route path="/therapists/:id" element={<PublicLayout><TherapistDetailPage /></PublicLayout>} />
+          <Route path="/therapeute/creer-profil" element={<CreerTherapistProfile />} />
+          <Route path="/therapeute/en-attente" element={<PendingPage />} />
+          <Route path="/therapeute/refuse" element={<RefusedPage />} />
+          
 
           {/* Patient Protected Routes */}
           <Route path="/patient" element={

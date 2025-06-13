@@ -1,6 +1,8 @@
 package micro.mentalhealth.project.service;
 
 import jakarta.transaction.Transactional;
+import micro.mentalhealth.project.dto.DisponibiliteDTO;
+import micro.mentalhealth.project.dto.PlageHoraireDTO;
 import micro.mentalhealth.project.dto.SeanceDTO;
 import micro.mentalhealth.project.mapper.SeanceMapper;
 import micro.mentalhealth.project.model.LienVisio;
@@ -13,7 +15,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -77,24 +81,51 @@ public class SeanceService {
     // -------------- Price preview ----------------
     public float calculateAmount(UUID therapistId, int dureeMinutes) {
         Float prixParHeure = restTemplate.getForObject(
-                "http://therapist-service/api/therapeutes/" + therapistId + "/prix", Float.class);
+                "http://therapeute-service/api/therapeutes/profiles/" + therapistId + "/price", Float.class);
         if (prixParHeure == null) throw new RuntimeException("Prix non disponible");
         return prixParHeure * (dureeMinutes / 60.0f);
     }
 
     // -------------- Check therapist availability -------------
     public boolean isTherapistAvailable(UUID therapistId, LocalDateTime dateTime, int dureeMinutes) {
-        List<Seance> seances = seanceRepository.findByTherapeuteId(therapistId);
-        LocalDateTime requestedEnd = dateTime.plusMinutes(dureeMinutes);
+        // 1. Récupérer disponibilités du thérapeute via REST
+        String url = "http://therapeute-service/api/therapeutes/" + therapistId + "/disponibilites";
+        DisponibiliteDTO[] disponibilites = restTemplate.getForObject(url, DisponibiliteDTO[].class);
 
-        for (Seance s : seances) {
-            LocalDateTime start = s.getDateHeure();
-            LocalDateTime end = start.plusMinutes(s.getDureeMinutes());
-            if (dateTime.isBefore(end) && requestedEnd.isAfter(start)) {
-                return false;
+        if (disponibilites == null || disponibilites.length == 0) {
+            return false; // Pas de disponibilités => pas dispo
+        }
+
+        DayOfWeek jourSeance = dateTime.getDayOfWeek();
+        LocalTime heureDebutSeance = dateTime.toLocalTime();
+        LocalTime heureFinSeance = heureDebutSeance.plusMinutes(dureeMinutes);
+
+        // 2. Vérifier si la séance est dans une plage horaire dispo
+        boolean dansPlage = false;
+        for (DisponibiliteDTO dispo : disponibilites) {
+            if (dispo.getJour().equals(jourSeance)) {
+                PlageHoraireDTO plage = dispo.getPlageHoraire();
+                LocalTime debutPlage = plage.getHeureDebut();
+                LocalTime finPlage = plage.getHeureFin();
+
+                if (!heureDebutSeance.isBefore(debutPlage) && !heureFinSeance.isAfter(finPlage)) {
+                    dansPlage = true;
+                    break;
+                }
             }
         }
-        return true;
+        if (!dansPlage) return false; // Pas dans les plages horaires du thérapeute
+
+        // 3. Vérifier conflits avec les séances déjà planifiées du thérapeute
+        LocalDateTime finSeance = dateTime.plusMinutes(dureeMinutes);
+        List<Seance> seancesConflit = seanceRepository.findConflictingSeances(therapistId, dateTime, finSeance);
+
+        // Si une séance existe et chevauche, le thérapeute n'est pas disponible
+        if (!seancesConflit.isEmpty()) {
+            return false;
+        }
+
+        return true; // Pas de conflit et dans plage dispo
     }
     public SeanceDTO createPendingSeance(UUID therapistId, UUID patientId, LocalDateTime dateTime, int dureeMinutes, TypeSeance typeSeance) {
         System.out.println("Checking therapist availability...");
@@ -241,36 +272,7 @@ public class SeanceService {
 
     // ---- Replaced Lombok by standard constructors and getters/setters ----
 
-    static class CreatePaymentRequest {
-        private UUID patientId;
-        private UUID therapistId;
-        private UUID seanceId;
-        private float amount;
-        private String paymentMethod;
 
-        public CreatePaymentRequest(UUID patientId, UUID therapistId, UUID seanceId, float amount, String paymentMethod) {
-            this.patientId = patientId;
-            this.therapistId = therapistId;
-            this.seanceId = seanceId;
-            this.amount = amount;
-            this.paymentMethod = paymentMethod;
-        }
-
-        public UUID getPatientId() { return patientId; }
-        public void setPatientId(UUID patientId) { this.patientId = patientId; }
-
-        public UUID getTherapistId() { return therapistId; }
-        public void setTherapistId(UUID therapistId) { this.therapistId = therapistId; }
-
-        public UUID getSeanceId() { return seanceId; }
-        public void setSeanceId(UUID seanceId) { this.seanceId = seanceId; }
-
-        public float getAmount() { return amount; }
-        public void setAmount(float amount) { this.amount = amount; }
-
-        public String getPaymentMethod() { return paymentMethod; }
-        public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
-    }
 
     static class PaymentResponse {
         private UUID id;

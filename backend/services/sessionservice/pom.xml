@@ -103,11 +103,15 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version> <!-- add version -->
 				<configuration>
+					<source>21</source>     <!-- or 11, or 21 based on your setup -->
+					<target>21</target>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.projectlombok</groupId>
 							<artifactId>lombok</artifactId>
+							<version>1.18.30</version> <!-- ensure version is set -->
 						</path>
 					</annotationProcessorPaths>
 				</configuration>

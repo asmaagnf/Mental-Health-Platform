@@ -36,6 +36,18 @@ public class PaymentController {
         return ResponseEntity.ok(payment);
     }
 
+    @GetMapping("/therapists/{therapistId}/earnings")
+    public ResponseEntity<Double> getTherapistEarnings(@PathVariable UUID therapistId) {
+        return ResponseEntity.ok(paymentService.getTherapistEarnings(therapistId));
+    }
+
+    @PutMapping("/therapists/{therapistId}/earnings")
+    public ResponseEntity<Void> updateTherapistEarnings(
+            @PathVariable UUID therapistId,
+            @RequestParam double amount) {
+        paymentService.updateTherapistEarnings(therapistId, amount);
+        return ResponseEntity.ok().build();
+    }
     // Get all payments
     @GetMapping
     public ResponseEntity<List<PaymentDTO>> getAllPayments() {

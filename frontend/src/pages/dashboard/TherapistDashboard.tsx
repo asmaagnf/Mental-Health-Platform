@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Calendar, DollarSign, Clock, Video, Phone, MessageSquare, TrendingUp, Bell, Star } from 'lucide-react';
+import TherapistRedirector  from "../../components/TherapistRedirector";
 
 // Mock data for dashboard
 const MOCK_DASHBOARD_DATA = {
@@ -74,6 +75,8 @@ const MOCK_DASHBOARD_DATA = {
 const TherapistDashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState(MOCK_DASHBOARD_DATA);
   const [currentTime, setCurrentTime] = useState(new Date());
+const user = JSON.parse(localStorage.getItem("user"));
+const userId = user?.id;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -97,6 +100,8 @@ const TherapistDashboard: React.FC = () => {
   };
 
   return (
+    <>
+    <TherapistRedirector userId={userId} />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <style>
         {`
@@ -331,6 +336,7 @@ const TherapistDashboard: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

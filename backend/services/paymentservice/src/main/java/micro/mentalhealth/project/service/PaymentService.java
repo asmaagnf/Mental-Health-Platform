@@ -16,6 +16,7 @@ import com.itextpdf.text.pdf.PdfWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import micro.mentalhealth.project.repository.TherapistEarningsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,15 +33,29 @@ public class PaymentService {
     @Autowired
     private  RemboursementRepository remboursementRepository;
 
+    private final TherapistEarningsRepository therapistEarningsRepository;
+
     // ------------------ PAYMENT ------------------
 
     public PaymentDTO createPayment(CreatePaymentRequest request) {
         Payment payment = PaymentMapper.toEntity(request);
         payment.setPaymentStatus(PaymentStatus.REUSSI); // For manual project, assume always successful
         Payment saved = paymentRepository.save(payment);
+        updateTherapistEarnings(request.getTherapistId(), request.getAmount());
         return PaymentMapper.toDTO(saved);
     }
 
+    public void updateTherapistEarnings(UUID therapistId, double amount) {
+        TherapistEarnings earnings = therapistEarningsRepository.findByTherapistId(therapistId)
+                .orElseGet(() -> {
+                    TherapistEarnings newEarnings = new TherapistEarnings();
+                    newEarnings.setTherapistId(therapistId);
+                    return therapistEarningsRepository.save(newEarnings);
+                });
+
+        earnings.setTotalEarnings(earnings.getTotalEarnings() + amount);
+        therapistEarningsRepository.save(earnings);
+    }
     @Transactional
     public void updatePaymentWithSeanceId(UUID paymentId, UUID seanceId) {
         Payment payment = paymentRepository.findById(paymentId)
@@ -118,17 +133,41 @@ public class PaymentService {
 
     // ------------------ REMBOURSEMENT ------------------
 
+    @Transactional
     public RemboursementDTO createRemboursement(CreateRemboursementRequest request) {
         Payment payment = paymentRepository.findById(request.getPaiementId())
-                .orElseThrow(() -> new EntityNotFoundException("Paiement introuvable pour remboursement"));
+                .orElseThrow(() -> new EntityNotFoundException("Paiement introuvable"));
 
         if (request.getMontant() > payment.getAmount()) {
             throw new IllegalArgumentException("Montant du remboursement > montant du paiement");
         }
 
+        // Create refund
         Remboursement remboursement = RemboursementMapper.toEntity(request);
         Remboursement saved = remboursementRepository.save(remboursement);
+
+        // Update payment status
+        payment.setPaymentStatus(PaymentStatus.REMBOURSE);
+        paymentRepository.save(payment);
+
+        // Deduct from therapist earnings
+        deductFromEarnings(payment.getTherapistId(), request.getMontant());
+
         return RemboursementMapper.toDTO(saved);
+    }
+
+    private void deductFromEarnings(UUID therapistId, double amount) {
+        TherapistEarnings earnings = therapistEarningsRepository.findByTherapistId(therapistId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist earnings record not found"));
+
+        earnings.setTotalEarnings(earnings.getTotalEarnings() - amount);
+        therapistEarningsRepository.save(earnings);
+    }
+
+    public double getTherapistEarnings(UUID therapistId) {
+        return therapistEarningsRepository.findByTherapistId(therapistId)
+                .map(TherapistEarnings::getTotalEarnings)
+                .orElse(0.0);
     }
 
     public RemboursementDTO getRemboursement(UUID id) {

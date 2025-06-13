@@ -1,120 +1,206 @@
 package micro.mentalhealth.project.service;
 
-import lombok.RequiredArgsConstructor;
-import micro.mentalhealth.project.dto.ProfilTherapeuteDTO;
-import micro.mentalhealth.project.mapper.ProfilTherapeuteMapper;
-import micro.mentalhealth.project.model.Certification;
 import micro.mentalhealth.project.model.ProfilTherapeute;
-import micro.mentalhealth.project.model.StatutTherapeute;
+import micro.mentalhealth.project.model.valueobjects.StatutProfil;
+import micro.mentalhealth.project.model.events.TherapistProfileCreatedEvent;
+import micro.mentalhealth.project.model.events.TherapistProfileUpdatedEvent;
+import micro.mentalhealth.project.model.events.TherapistValidatedEvent;
+import micro.mentalhealth.project.model.events.TherapistRejectedEvent;
 import micro.mentalhealth.project.repository.ProfilTherapeuteRepository;
+import micro.mentalhealth.project.dto.profiltherapeute.ProfilTherapeuteRequest;
+import micro.mentalhealth.project.dto.profiltherapeute.ProfilTherapeuteResponse;
+import micro.mentalhealth.project.mapper.ProfilTherapeuteMapper;
+import micro.mentalhealth.project.mapper.DiplomaMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class ProfilTherapeuteService {
 
-    private final ProfilTherapeuteRepository repository;
+    private final ProfilTherapeuteRepository profilTherapeuteRepository;
+    private final ProfilTherapeuteMapper profilTherapeuteMapper;
+    private final DiplomaMapper DiplomaMapper;
+    private final ApplicationEventPublisher eventPublisher;
+    private final String UPLOAD_DIR = "C:/Users/HP/Desktop/mental-health-platform/backend/services/therapeuteService/uploads/";
 
-    public ProfilTherapeuteDTO createProfil(ProfilTherapeuteDTO dto) {
-        ProfilTherapeute profil = ProfilTherapeuteMapper.toEntity(dto);
-        profil.setId(UUID.randomUUID());
-        profil.setCreatedAt(LocalDateTime.now());
-        profil.setStatut(StatutTherapeute.EN_ATTENTE);
-
-        ProfilTherapeute saved = repository.save(profil);
-        return ProfilTherapeuteMapper.toDto(saved);
+    @Autowired
+    public ProfilTherapeuteService(ProfilTherapeuteRepository profilTherapeuteRepository,
+                                   ProfilTherapeuteMapper profilTherapeuteMapper,
+                                   DiplomaMapper DiplomaMapper,
+                                   ApplicationEventPublisher eventPublisher) {
+        this.profilTherapeuteRepository = profilTherapeuteRepository;
+        this.profilTherapeuteMapper = profilTherapeuteMapper;
+        this.DiplomaMapper = DiplomaMapper;
+        this.eventPublisher = eventPublisher;
+        try {
+            Files.createDirectories(Paths.get(UPLOAD_DIR));
+        } catch (IOException e) {
+            throw new RuntimeException("Could not create upload directory", e);
+        }
     }
 
-    public ProfilTherapeuteDTO updateProfil(UUID id, ProfilTherapeuteDTO dto) {
-        ProfilTherapeute profil = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Profil thérapeute non trouvé avec l'ID : " + id));
 
-        profil.setSpecialites(dto.getSpecialites());
-        profil.setLanguesParlees(dto.getLanguesParlees());
-        profil.setLocalisation(dto.getLocalisation());
-        profil.setAnneesExperience(dto.getAnneesExperience());
-        profil.setPrixParHeure(dto.getPrixParHeure());
+    @Transactional
 
-        // Update certifications only if non-empty list provided
-        if (dto.getCertificationsBase64() != null && !dto.getCertificationsBase64().isEmpty()) {
-            List<Certification> decodedCerts = new ArrayList<>();
-            for (String base64 : dto.getCertificationsBase64()) {
-                byte[] fileBytes = Base64.getDecoder().decode(base64);
-                decodedCerts.add(new Certification(fileBytes));
-            }
-            profil.setCertifications(decodedCerts);
+    public ProfilTherapeuteResponse createInitialProfil(UUID userId, ProfilTherapeuteRequest request) {
+        if (profilTherapeuteRepository.findByUserId(userId).isPresent()) {
+            throw new IllegalArgumentException("Profile already exists for this user: " + userId);
         }
 
-        ProfilTherapeute updated = repository.save(profil);
-        return ProfilTherapeuteMapper.toDto(updated);
+        ProfilTherapeute newProfil = new ProfilTherapeute();
+        newProfil.setUserId(userId);
+        newProfil.setSpecialites(request.getSpecialites());
+        newProfil.setDescription(request.getDescription());
+        newProfil.setAnneesExperience(request.getAnneesExperience());
+        newProfil.setDiplomas(DiplomaMapper.toEntityList(request.getDiplomas()));
+        newProfil.setLanguesParlees(request.getLanguesParlees());
+        newProfil.setLocalisation(request.getLocalisation());
+        newProfil.setAvailable(request.getAvailable());
+        newProfil.setPrixParHeure(request.getPrixParHeure());
+        newProfil.setStatutProfil(StatutProfil.EN_ATTENTE); // ✅ Important
+
+        ProfilTherapeute savedProfil = profilTherapeuteRepository.save(newProfil);
+        eventPublisher.publishEvent(new TherapistProfileCreatedEvent(userId));
+        return profilTherapeuteMapper.toDto(savedProfil);
     }
 
-    public ProfilTherapeuteDTO getById(UUID id) {
-        return repository.findById(id)
-                .map(ProfilTherapeuteMapper::toDto)
-                .orElseThrow(() -> new RuntimeException("Profil thérapeute non trouvé avec l'ID : " + id));
-    }
+    @Transactional
+    public ProfilTherapeuteResponse updateProfil(UUID userId, ProfilTherapeuteRequest request) {
+        ProfilTherapeute existingProfil = profilTherapeuteRepository.findByUserId(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with userId: " + userId));
 
-    public void changerStatut(UUID id, StatutTherapeute nouveauStatut) {
-        ProfilTherapeute profil = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Profil thérapeute non trouvé avec l'ID : " + id));
+        // Use the mapper to apply updates from the request DTO to the existing entity.
+        // The profilTherapeuteMapper's toEntity method is designed for this.
+        // However, since you're updating an *existing* entity, you need to be careful.
+        // Instead of creating a new entity, we'll update the existing one's fields.
+        // We'll leverage the mapper's internal logic for complex nested objects like diplomas.
 
-        profil.setStatut(nouveauStatut);
+        ProfilTherapeute tempProfil = profilTherapeuteMapper.toEntity(request); // Map request to a temporary entity
 
-        if (nouveauStatut == StatutTherapeute.VALIDE) {
-            profil.setValidatedAt(LocalDateTime.now());
+        existingProfil.setSpecialites(tempProfil.getSpecialites());
+        existingProfil.setDescription(tempProfil.getDescription());
+        existingProfil.setAnneesExperience(tempProfil.getAnneesExperience());
+        existingProfil.setDiplomas(tempProfil.getDiplomas()); // This will now correctly use the mapped diplomas from tempProfil
+        existingProfil.setLanguesParlees(tempProfil.getLanguesParlees());
+        existingProfil.setLocalisation(tempProfil.getLocalisation());
+        existingProfil.setAvailable(tempProfil.getAvailable());
+        existingProfil.setPrixParHeure(tempProfil.getPrixParHeure());
+
+        // Keep status as EN_ATTENTE or current if already validated/rejected
+        if (existingProfil.getStatutProfil() != StatutProfil.VALIDE && existingProfil.getStatutProfil() != StatutProfil.REJETE) {
+            existingProfil.setStatutProfil(StatutProfil.EN_ATTENTE); // Ensures it goes to pending if not yet validated or already rejected
         }
 
-        repository.save(profil);
+
+        ProfilTherapeute updatedProfil = profilTherapeuteRepository.save(existingProfil);
+        eventPublisher.publishEvent(new TherapistProfileUpdatedEvent(updatedProfil.getId()));
+        return profilTherapeuteMapper.toDto(updatedProfil);
     }
 
-    public void updateLocalisation(UUID id, String adresse) {
-        ProfilTherapeute profil = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Profil thérapeute non trouvé avec l'ID : " + id));
-
-        profil.setLocalisation(adresse);
-        repository.save(profil);
-    }
-
-    public void addCertification(UUID id, MultipartFile file) throws IOException {
-        ProfilTherapeute profil = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Profil thérapeute non trouvé avec l'ID : " + id));
-
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("Le fichier doit être une image.");
+    @Transactional
+    public String uploadDiplomaImage(UUID userId, String diplomaTitle, MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File is empty");
         }
+        // Save file as before
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String uniqueFilename = UUID.randomUUID().toString() + fileExtension;
 
-        List<Certification> certs = Optional.ofNullable(profil.getCertifications()).orElse(new ArrayList<>());
-        certs.add(new Certification(file.getBytes()));
-        profil.setCertifications(certs);
+        Path path = Paths.get(UPLOAD_DIR + uniqueFilename);
+        Files.copy(file.getInputStream(), path);
 
-        repository.save(profil);
+        String imageUrl = "/uploads/" + uniqueFilename;
+
+        // Now update the diploma imageUrl in the profile
+        ProfilTherapeute profil = profilTherapeuteRepository.findByUserId(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with userId: " + userId));
+
+        // Find the diploma by title (or some unique identifier)
+        profil.getDiplomas().stream()
+                .filter(d -> d.getTitle().equalsIgnoreCase(diplomaTitle))
+                .findFirst()
+                .ifPresent(diploma -> diploma.setImageUrl(imageUrl));
+
+        profilTherapeuteRepository.save(profil);
+
+        return imageUrl;
     }
-
-    public List<ProfilTherapeuteDTO> getAllProfils() {
-        return repository.findAll()
-                .stream()
-                .map(ProfilTherapeuteMapper::toDto)
+    @Transactional(readOnly = true)
+    public List<ProfilTherapeuteResponse> getProfilsByStatutValide() {
+        List<ProfilTherapeute> profils = profilTherapeuteRepository.findByStatutProfil(StatutProfil.VALIDE);
+        return profils.stream()
+                .map(profilTherapeuteMapper::toDto)
                 .toList();
     }
 
-    public void deleteProfil(UUID id) {
-        if (!repository.existsById(id)) {
-            throw new RuntimeException("Profil thérapeute non trouvé avec l'ID : " + id);
-        }
-        repository.deleteById(id);
+    @Transactional(readOnly = true)
+    public Double getPrixParHeureByUserId(UUID userId) {
+        return profilTherapeuteRepository.findByUserId(userId)
+                .map(ProfilTherapeute::getPrixParHeure)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with userId: " + userId));
     }
 
-    public List<ProfilTherapeuteDTO> getByStatut(StatutTherapeute statut) {
-        return repository.findAllByStatut(statut)
-                .stream()
-                .map(ProfilTherapeuteMapper::toDto)
+    @Transactional(readOnly = true)
+    public ProfilTherapeuteResponse getProfilByUserId(UUID userId) {
+        ProfilTherapeute profil = profilTherapeuteRepository.findByUserId(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with userId: " + userId));
+        return profilTherapeuteMapper.toDto(profil);
+    }
+
+    @Transactional(readOnly = true)
+    public ProfilTherapeuteResponse getProfilById(UUID profilId) {
+        ProfilTherapeute profil = profilTherapeuteRepository.findById(profilId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with id: " + profilId));
+        return profilTherapeuteMapper.toDto(profil);
+    }
+
+    @Transactional
+    public ProfilTherapeuteResponse validateProfil(UUID profilId) {
+        ProfilTherapeute profil = profilTherapeuteRepository.findById(profilId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with id: " + profilId));
+
+        if (profil.getStatutProfil() == StatutProfil.VALIDE) {
+            throw new IllegalArgumentException("Therapist profile is already validated.");
+        }
+
+        profil.setStatutProfil(StatutProfil.VALIDE);
+        ProfilTherapeute validatedProfil = profilTherapeuteRepository.save(profil);
+        eventPublisher.publishEvent(new TherapistValidatedEvent(profil.getId()));
+        return profilTherapeuteMapper.toDto(validatedProfil);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProfilTherapeuteResponse> getAllProfils() {
+        List<ProfilTherapeute> profils = profilTherapeuteRepository.findAll();
+        return profils.stream()
+                .map(profilTherapeuteMapper::toDto)
                 .toList();
+    }
+    @Transactional
+    public ProfilTherapeuteResponse rejectProfil(UUID profilId,  String reason) {
+        ProfilTherapeute profil = profilTherapeuteRepository.findById(profilId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with id: " + profilId));
+
+        if (profil.getStatutProfil() == StatutProfil.REJETE) {
+            throw new IllegalArgumentException("Therapist profile is already rejected.");
+        }
+
+        profil.setStatutProfil(StatutProfil.REJETE);
+        ProfilTherapeute rejectedProfil = profilTherapeuteRepository.save(profil);
+        eventPublisher.publishEvent(new TherapistRejectedEvent(profil.getId(),  reason));
+        return profilTherapeuteMapper.toDto(rejectedProfil);
     }
 }

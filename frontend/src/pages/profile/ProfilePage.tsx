@@ -1,91 +1,131 @@
-import React from 'react';
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
-const ProfilePage = () => {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Profile</h1>
-        
-        <div className="space-y-6">
-          <div className="flex items-center space-x-4">
-            <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center">
-              <span className="text-4xl text-gray-400">👤</span>
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">John Doe</h2>
-              <p className="text-gray-600">john.doe@example.com</p>
-            </div>
-          </div>
+const UserProfile = () => {
+  const [userData, setUserData] = useState(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    dateOfBirth: "",
+    address: "",
+    gender: "",
+    profilePictureUrl: ""
+  });
 
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Full Name</label>
-                <input
-                  type="text"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value="John Doe"
-                  readOnly
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <input
-                  type="email"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value="john.doe@example.com"
-                  readOnly
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone Number</label>
-                <input
-                  type="tel"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value="+1 (555) 123-4567"
-                  readOnly
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Location</label>
-                <input
-                  type="text"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value="New York, NY"
-                  readOnly
-                />
-              </div>
-            </div>
-          </div>
+  // Charger les données utilisateur depuis le backend
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("user"));
+    if (user && user.id) {
+      fetch(`http://localhost:8090/api/user/${user.id}`)
+        .then(res => res.json())
+        .then(data => {
+          setUserData(data);
+          setFormData({
+            name: data.name || "",
+            email: data.email || "",
+            phoneNumber: data.phoneNumber || "",
+            dateOfBirth: data.dateOfBirth || "",
+            address: data.address || "",
+            gender: data.gender || "",
+            profilePictureUrl: data.profilePictureUrl || ""
+          });
+        })
+        .catch(err => {
+          console.error("Erreur de chargement :", err);
+          toast.error("Erreur lors du chargement du profil.");
+        });
+    }
+  }, []);
 
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Preferences</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">Email Notifications</span>
-                <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
-                  Manage
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">Privacy Settings</span>
-                <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
-                  Update
-                </button>
-              </div>
-            </div>
-          </div>
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-          <div className="border-t pt-6">
-            <button className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600">
-              Edit Profile
-            </button>
-          </div>
-        </div>
+  const handleSubmit = e => {
+    e.preventDefault();
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    fetch(`http://localhost:8090/api/user/update/${user.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Échec de la mise à jour");
+        return res.json();
+      })
+      .then(data => {
+        toast.success("Profil mis à jour !");
+        setUserData(data);
+      })
+      .catch(err => {
+        console.error("Erreur :", err);
+        toast.error("Une erreur est survenue lors de la mise à jour.");
+      });
+  };
+
+  if (!userData)
+    return (
+      <div className="text-center mt-10 text-gray-600">
+        Chargement du profil...
       </div>
+    );
+
+  return (
+    <div className="max-w-4xl mx-auto mt-10 p-8 bg-white rounded-2xl shadow-lg border border-gray-200">
+
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">Modifier mon profil</h1>
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {[
+          { label: "Nom complet", name: "name", type: "text" },
+          { label: "Email", name: "email", type: "email" },
+          { label: "Téléphone", name: "phoneNumber", type: "text" },
+          { label: "Date de naissance", name: "dateOfBirth", type: "date" },
+          { label: "Adresse", name: "address", type: "text" },
+          { label: "URL Photo de profil", name: "profilePictureUrl", type: "text", full: true }
+        ].map(({ label, name, type, full }) => (
+          <div className={full ? "md:col-span-2" : ""} key={name}>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <input
+              type={type}
+              name={name}
+              value={formData[name]}
+              onChange={handleChange}
+              className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={`Entrez votre ${label.toLowerCase()}`}
+            />
+          </div>
+        ))}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Genre</label>
+          <select
+            name="gender"
+            value={formData.gender}
+            onChange={handleChange}
+            className="w-full p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Sélectionner</option>
+            <option value="FEMALE">Femme</option>
+            <option value="MALE">Homme</option>
+            <option value="OTHER">Autre</option>
+          </select>
+        </div>
+
+        <div className="md:col-span-2 text-right mt-4">
+          <button
+            type="submit"
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 shadow transition"
+          >
+            Enregistrer les modifications
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
-export default ProfilePage;
+export default UserProfile;

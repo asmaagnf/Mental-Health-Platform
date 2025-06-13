@@ -15,14 +15,14 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-public class WebConfig implements WebMvcConfigurer {
+public class SecurityConfig implements WebMvcConfigurer {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // Configuration des options de sécurité
         http.csrf(AbstractHttpConfigurer::disable) // Désactive la protection CSRF
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Ajoute la configuration CORS ici
                 .authorizeHttpRequests(authorize -> authorize // Configuration des autorisations d'accès
-                        .requestMatchers("/api/**").permitAll() // Autorise l'accès à ces endpoints pour tous
+                        .requestMatchers("/api/**","/uploads/**").permitAll() // Autorise l'accès à ces endpoints pour tous
 
                         .anyRequest().authenticated()); // Toutes les autres requêtes nécessitent une authentification
 
@@ -35,7 +35,7 @@ public class WebConfig implements WebMvcConfigurer {
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
 
         // Autorise tous les méthodes HTTP (GET, POST, PUT, DELETE, etc.)
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"));
+        configuration.setAllowedMethods(List.of("*"));
 
         // Autorise tous les en-têtes
         configuration.setAllowedHeaders(List.of("*"));
@@ -50,7 +50,5 @@ public class WebConfig implements WebMvcConfigurer {
 
         return source; // Retourne la source de configuration CORS
     }
-
-
 }
 

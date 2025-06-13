@@ -1,96 +1,93 @@
 package micro.mentalhealth.project.service;
 
-import lombok.RequiredArgsConstructor;
-import micro.mentalhealth.project.dto.DisponibiliteDto;
-import micro.mentalhealth.project.mapper.DisponibiliteMapper;
 import micro.mentalhealth.project.model.Disponibilite;
+import micro.mentalhealth.project.model.ProfilTherapeute;
+import micro.mentalhealth.project.model.events.TherapistAvailabilityChangedEvent;
 import micro.mentalhealth.project.repository.DisponibiliteRepository;
-import micro.mentalhealth.project.repository.ProfilTherapeuteRepository;  // Assuming this exists
+import micro.mentalhealth.project.repository.ProfilTherapeuteRepository;
+import micro.mentalhealth.project.dto.disponibilite.DisponibiliteRequest;
+import micro.mentalhealth.project.dto.disponibilite.DisponibiliteResponse;
+import micro.mentalhealth.project.mapper.DisponibiliteMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class DisponibiliteService {
 
-    private final DisponibiliteRepository repository;
-    private final ProfilTherapeuteRepository profilRepository; // To check therapist existence
+    private final DisponibiliteRepository disponibiliteRepository;
+    private final ProfilTherapeuteRepository profilTherapeuteRepository;
+    private final DisponibiliteMapper disponibiliteMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public List<DisponibiliteDto> getDisponibilitesByTherapeute(UUID therapeuteId) {
-        return repository.findByTherapeuteId(therapeuteId)
-                .stream()
-                .map(DisponibiliteMapper::toDto)
-                .collect(Collectors.toList());
+    @Autowired
+    public DisponibiliteService(DisponibiliteRepository disponibiliteRepository,
+                                ProfilTherapeuteRepository profilTherapeuteRepository,
+                                DisponibiliteMapper disponibiliteMapper,
+                                ApplicationEventPublisher eventPublisher) {
+        this.disponibiliteRepository = disponibiliteRepository;
+        this.profilTherapeuteRepository = profilTherapeuteRepository;
+        this.disponibiliteMapper = disponibiliteMapper;
+        this.eventPublisher = eventPublisher;
     }
 
-    public DisponibiliteDto addDisponibilite(DisponibiliteDto dto) {
-        validateTherapeuteExists(dto.getTherapeuteId());
-        checkForOverlapOrDuplicate(dto, null);
+    @Transactional
+    public DisponibiliteResponse addDisponibilite(UUID therapeuteId, DisponibiliteRequest request) {
+        // Ensure the therapeuteId exists
+        profilTherapeuteRepository.findByUserId(therapeuteId)
+                .orElseThrow(() -> new EntityNotFoundException("Therapist profile not found with id: " + therapeuteId));
 
-        Disponibilite saved = repository.save(DisponibiliteMapper.toEntity(dto));
-        return DisponibiliteMapper.toDto(saved);
-    }
-
-    public DisponibiliteDto updateDisponibilite(UUID id, DisponibiliteDto dto) {
-        Disponibilite existing = repository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Disponibilité non trouvée avec l'ID: " + id));
-
-        validateTherapeuteExists(existing.getTherapeuteId());
-        checkForOverlapOrDuplicate(dto, id);
-
-        existing.setJour(dto.getJour());
-        existing.setPlageHoraire(dto.getPlageHoraire());
-
-        Disponibilite updated = repository.save(existing);
-        return DisponibiliteMapper.toDto(updated);
-    }
-
-    public void deleteDisponibilite(UUID id) {
-        if (!repository.existsById(id)) {
-            throw new NoSuchElementException("Disponibilité non trouvée avec l'ID: " + id);
-        }
-        repository.deleteById(id);
-    }
-
-    public DisponibiliteDto getById(UUID id) {
-        Disponibilite dispo = repository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Disponibilité non trouvée avec l'ID: " + id));
-        return DisponibiliteMapper.toDto(dispo);
-    }
-
-    private void validateTherapeuteExists(UUID therapeuteId) {
-        boolean exists = profilRepository.existsById(therapeuteId);
-        if (!exists) {
-            throw new IllegalArgumentException("Le thérapeute avec l'ID " + therapeuteId + " n'existe pas.");
-        }
-    }
-
-    /**
-     * Check if the new or updated Disponibilite overlaps or duplicates existing ones
-     * for the same therapist, day, and time slot.
-     *
-     * @param dto DisponibiliteDto to add or update
-     * @param updatingId UUID of the Disponibilite being updated (null if adding)
-     */
-    private void checkForOverlapOrDuplicate(DisponibiliteDto dto, UUID updatingId) {
-        List<Disponibilite> existingDispos = repository.findByTherapeuteId(dto.getTherapeuteId());
-
-        boolean conflict = existingDispos.stream()
-                .anyMatch(d -> {
-                    // Skip the availability being updated (if any)
-                    if (updatingId != null && d.getId().equals(updatingId)) {
-                        return false;
-                    }
-                    // Check if same day and same time slot
-                    return d.getJour() == dto.getJour() && d.getPlageHoraire() == dto.getPlageHoraire();
+        // Check if availability for this day already exists
+        disponibiliteRepository.findByTherapeuteIdAndJour(therapeuteId, request.getJour())
+                .ifPresent(d -> {
+                    throw new IllegalArgumentException("Availability for this day already exists for the therapist: " + request.getJour());
                 });
 
-        if (conflict) {
-            throw new IllegalArgumentException("Conflit de disponibilité: cette plage horaire est déjà définie pour ce thérapeute ce jour.");
-        }
+        Disponibilite disponibilite = disponibiliteMapper.toEntity(request);
+        disponibilite.setTherapeuteId(therapeuteId);
+        Disponibilite savedDisponibilite = disponibiliteRepository.save(disponibilite);
+        eventPublisher.publishEvent(new TherapistAvailabilityChangedEvent(therapeuteId, savedDisponibilite.getId()));
+        return disponibiliteMapper.toDto(savedDisponibilite);
+    }
+
+    @Transactional
+    public DisponibiliteResponse updateDisponibilite(UUID disponibiliteId, DisponibiliteRequest request) {
+        Disponibilite existingDisponibilite = disponibiliteRepository.findById(disponibiliteId)
+                .orElseThrow(() -> new EntityNotFoundException("Availability not found with id: " + disponibiliteId));
+
+        existingDisponibilite.setJour(request.getJour());
+        existingDisponibilite.setPlageHoraire(disponibiliteMapper.toTimeRangeEntity(request.getPlageHoraire()));
+
+        Disponibilite updatedDisponibilite = disponibiliteRepository.save(existingDisponibilite);
+        eventPublisher.publishEvent(new TherapistAvailabilityChangedEvent(updatedDisponibilite.getTherapeuteId(), updatedDisponibilite.getId()));
+        return disponibiliteMapper.toDto(updatedDisponibilite);
+    }
+
+    @Transactional
+    public void deleteDisponibilite(UUID disponibiliteId) {
+        Disponibilite existingDisponibilite = disponibiliteRepository.findById(disponibiliteId)
+                .orElseThrow(() -> new EntityNotFoundException("Availability not found with id: " + disponibiliteId));
+
+        disponibiliteRepository.delete(existingDisponibilite);
+        eventPublisher.publishEvent(new TherapistAvailabilityChangedEvent(existingDisponibilite.getTherapeuteId(), existingDisponibilite.getId()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<DisponibiliteResponse> getDisponibilitesByTherapeuteId(UUID therapeuteId) {
+        List<Disponibilite> disponibilites = disponibiliteRepository.findByTherapeuteId(therapeuteId);
+        return disponibiliteMapper.toDtoList(disponibilites);
+    }
+
+    @Transactional(readOnly = true)
+    public DisponibiliteResponse getDisponibiliteById(UUID id) {
+        Disponibilite disponibilite = disponibiliteRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Availability not found with id: " + id));
+        return disponibiliteMapper.toDto(disponibilite);
     }
 }

@@ -1,26 +1,35 @@
 package micro.mentalhealth.project.model;
 
+import micro.mentalhealth.project.model.valueobjects.TimeRange;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import jakarta.persistence.*;
-import lombok.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+
+import java.time.DayOfWeek;
 import java.util.UUID;
 
 @Entity
+@Table(name = "disponibilites")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Disponibilite {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private UUID therapeuteId;
+    @NotNull
+    private UUID therapeuteId; // Foreign key to ProfilTherapeute (UUID as String)
 
     @Enumerated(EnumType.STRING)
-    private JourDisponibilite jour; // Enum: LUNDI à DIMANCHE
+    @NotNull
+    private DayOfWeek jour;
 
     @Embedded
-    private PlageHoraire plageHoraire;
+    @Valid
+    private TimeRange plageHoraire;
 }
-
