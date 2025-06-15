@@ -4,6 +4,14 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
+interface UserInfo {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  profilePictureUrl: string | null;
+}
+
 interface Diploma {
   title: string;
   institution: string;
@@ -20,10 +28,11 @@ interface TherapistProfile {
   localisation: string;
   available: boolean;
   prixParHeure: number;
+  user?: UserInfo;
 }
 
 const CreerTherapistProfile: React.FC = () => {
-      const navigate = useNavigate();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('personal');
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -47,15 +56,38 @@ const CreerTherapistProfile: React.FC = () => {
   });
   const [diplomaImage, setDiplomaImage] = useState<File | null>(null);
   const [therapistId, setTherapistId] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    // Get therapist ID from localStorage
     const user = JSON.parse(localStorage.getItem("user") || '{}');
     if (user?.id) {
       setTherapistId(user.id);
       fetchProfileData(user.id);
+      fetchUserInfo(user.id);
     }
   }, []);
+
+  const fetchUserInfo = async (id: string) => {
+    try {
+      const response = await axios.get(`http://localhost:8090/api/user/${id}`);
+      const user = response.data;
+      setProfileData(prev => ({
+        ...prev,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          profilePictureUrl: user.profilePictureUrl 
+            ? `http://localhost:8090${user.profilePictureUrl}`
+            : null
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  };
 
   const fetchProfileData = async (id: string) => {
     try {
@@ -63,7 +95,6 @@ const CreerTherapistProfile: React.FC = () => {
       setProfileData(response.data);
     } catch (error) {
       console.error('Error fetching profile data:', error);
-      // Initialize with empty data if no profile exists
       setProfileData({
         specialites: [],
         description: '',
@@ -75,6 +106,61 @@ const CreerTherapistProfile: React.FC = () => {
         prixParHeure: 0
       });
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !therapistId) {
+      toast.error("Please select a file first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    setIsUploading(true);
+    try {
+      const response = await axios.post(
+        `http://localhost:8090/api/user/${therapistId}/upload-profile-picture`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      const data = response.data;
+      toast.success("Profile picture uploaded successfully!");
+      
+      // Update the profile picture URL in state
+      setProfileData(prev => ({
+        ...prev,
+        user: {
+          ...prev.user!,
+          profilePictureUrl: `http://localhost:8090${data.imageUrl}`
+        }
+      }));
+      
+      setSelectedFile(null);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Error uploading profile picture");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase();
   };
 
   const handleInputChange = (field: keyof TherapistProfile, value: any) => {
@@ -189,13 +275,12 @@ const CreerTherapistProfile: React.FC = () => {
 
       setHasChanges(false);
       setIsEditing(false);
-      // Refresh data
       fetchProfileData(therapistId);
-      toast('Profile saved successfully!');
+      toast.success('Profile saved successfully!');
       navigate('/therapeute/en-attente');
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Failed to save profile. Please try again.');
+      toast.error('Failed to save profile. Please try again.');
     }
   };
 
@@ -310,19 +395,53 @@ const CreerTherapistProfile: React.FC = () => {
       <div className="card p-6 mb-8">
         <div className="flex items-center space-x-6">
           <div className="relative">
-            <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {therapistId ? therapistId.charAt(0).toUpperCase() : 'T'}
-            </div>
+            {profileData.user?.profilePictureUrl ? (
+              <img
+                src={profileData.user.profilePictureUrl}
+                alt={profileData.user.name}
+                className="w-24 h-24 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                {profileData.user?.name ? getInitials(profileData.user.name) : 'T'}
+              </div>
+            )}
             {isEditing && (
-              <button className="absolute -bottom-2 -right-2 p-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors">
-                <Camera className="h-4 w-4" />
-              </button>
+              <div className="absolute -bottom-0 -right-0">
+                <input
+                  type="file"
+                  id="profile-picture-upload"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                <label
+                  htmlFor="profile-picture-upload"
+                  className=" bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors cursor-pointer"
+                >
+                  <Camera className="h-5 w-6" />
+                </label>
+              </div>
             )}
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-900">Your Therapist Profile</h3>
+            <h3 className="text-xl font-bold text-slate-900">
+              {profileData.user?.name || 'Therapist Profile'}
+            </h3>
             <p className="text-slate-600">{profileData.specialites.join(', ') || 'No specialties yet'}</p>
             <p className="text-sm text-slate-500">{profileData.anneesExperience} years of experience</p>
+            {selectedFile && (
+              <div className="mt-2 flex items-center space-x-2">
+                <span className="text-sm text-slate-600">{selectedFile.name}</span>
+                <button
+                  onClick={handleUpload}
+                  disabled={isUploading}
+                  className="text-sm bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                >
+                  {isUploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -361,6 +480,42 @@ const CreerTherapistProfile: React.FC = () => {
           <div className="card p-6">
             <h3 className="text-lg font-medium text-slate-900 mb-6">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Name</label>
+                <div className="flex items-center">
+                  <User className="h-5 w-5 text-slate-400 mr-2" />
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={profileData.user?.name || ''}
+                    disabled
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                <div className="flex items-center">
+                  <Mail className="h-5 w-5 text-slate-400 mr-2" />
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={profileData.user?.email || ''}
+                    disabled
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Phone</label>
+                <div className="flex items-center">
+                  <Phone className="h-5 w-5 text-slate-400 mr-2" />
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={profileData.user?.phoneNumber || ''}
+                    disabled
+                  />
+                </div>
+              </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-2">Location</label>
                 <div className="flex items-center">
@@ -619,7 +774,6 @@ const CreerTherapistProfile: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Hourly Rate (MAD)</label>
                   <div className="relative">
-                    
                     <input
                       type="number"
                       className="form-input pl-10"

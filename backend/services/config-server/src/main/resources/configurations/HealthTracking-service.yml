@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/HealthTracking_service_db
-    username: root
-    password: asmaa554
+    url: jdbc:mysql://localhost:3307/HealthTracking_service_db
+    username: asmaa
+    password: asmaa
     driver-class-name: com.mysql.cj.jdbc.Driver

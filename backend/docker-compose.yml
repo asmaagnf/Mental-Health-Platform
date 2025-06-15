@@ -1,0 +1,81 @@
+services:
+  mysql:
+    container_name: ms_mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: asmaa
+      MYSQL_USER: asmaa
+      MYSQL_PASSWORD: asmaa
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  phpmyadmin:
+    container_name: ms_phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: asmaa
+      PMA_PASSWORD: asmaa
+    ports:
+      - "8085:80"
+    depends_on:
+      - mysql
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo
+    container_name: mongo_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: asmaa
+      MONGO_INITDB_ROOT_PASSWORD: asmaa
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo_express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: asmaa
+      ME_CONFIG_MONGODB_ADMINPASSWORD: asmaa
+      ME_CONFIG_MONGODB_SERVER: mongo_db
+      ME_CONFIG_MONGODB_URL: mongodb://asmaa:asmaa@mongo_db:27017/
+    depends_on:
+      - mongodb
+    networks:
+      - microservices-net
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"     # AMQP port for backend services
+      - "15672:15672"   # Web UI
+    environment:
+      RABBITMQ_DEFAULT_USER: asmaa
+      RABBITMQ_DEFAULT_PASS: asmaa
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+networks:
+  microservices-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  mongo_data:

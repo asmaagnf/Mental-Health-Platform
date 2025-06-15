@@ -54,7 +54,6 @@ export default function MoodTracker() {
       const sorted = entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       setMoodEntries(sorted)
     } catch (err) {
-      setError("Failed to load mood entries")
       console.error("Error fetching mood entries:", err)
     } finally {
       setLoading(false)
@@ -149,7 +148,7 @@ export default function MoodTracker() {
 
             <div className="mb-8">
               <label htmlFor="moodNote" className="block text-sm font-semibold text-slate-700 mb-2">
-                Notes (optional)
+                Notes 
               </label>
               <textarea
                 id="moodNote"
