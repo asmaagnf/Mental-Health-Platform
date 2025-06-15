@@ -9,7 +9,6 @@ import {
   XCircle, 
   Download,
   RefreshCw,
-  Settings,
   Mail,
   Phone,
   MapPin,
@@ -18,10 +17,17 @@ import {
   Award,
   Calendar,
   X,
-  Plus,
-  Trash2,
+  User,
   Maximize2
 } from 'lucide-react';
+
+interface UserInfo {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  profilePictureUrl: string | null;
+}
 
 interface Diploma {
   title: string;
@@ -42,6 +48,7 @@ interface TherapistProfile {
   available: boolean;
   prixParHeure: number;
   statutProfil: 'EN_ATTENTE' | 'VALIDE' | 'REJETE';
+  user?: UserInfo; // Added user info
 }
 
 const TherapistValidationDashboard: React.FC = () => {
@@ -52,14 +59,54 @@ const TherapistValidationDashboard: React.FC = () => {
   const [selectedTherapist, setSelectedTherapist] = useState<TherapistProfile | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch all therapist profiles
+  // Fetch user info for a therapist
+  const fetchUserInfo = async (userId: string): Promise<UserInfo> => {
+    try {
+      const response = await axios.get(`http://localhost:8090/api/user/${userId}`);
+      const user = response.data;
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        profilePictureUrl: user.profilePictureUrl 
+          ? `http://localhost:8090${user.profilePictureUrl}`
+          : null
+      };
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      return {
+        id: userId,
+        name: 'Unknown',
+        email: '',
+        phoneNumber: '',
+        profilePictureUrl: null
+      };
+    }
+  };
+
+  // Fetch all therapist profiles with user info
   const fetchTherapists = async () => {
     try {
+      setLoading(true);
       const response = await axios.get('http://localhost:8040/api/therapeutes/profiles');
-      setTherapists(response.data);
+      const therapistsData = response.data;
+
+      // Fetch user info for each therapist
+      const therapistsWithUserInfo = await Promise.all(
+        therapistsData.map(async (therapist: TherapistProfile) => {
+          const userInfo = await fetchUserInfo(therapist.userId);
+          return { ...therapist, user: userInfo };
+        })
+      );
+
+      setTherapists(therapistsWithUserInfo);
     } catch (error) {
       console.error('Error fetching therapists:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,6 +114,13 @@ const TherapistValidationDashboard: React.FC = () => {
     fetchTherapists();
   }, []);
 
+  // Get initials from name
+  const getInitials = (name: string) => {
+    return name.split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase();
+  };
   // Filter therapists based on search and status
   const filteredTherapists = therapists.filter(therapist => {
     const matchesSearch = 
@@ -250,6 +304,7 @@ const TherapistValidationDashboard: React.FC = () => {
         </div>
 
         {/* Results */}
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <h2 className="text-xl font-bold text-slate-900 mb-2">
             {filterStatus === 'ALL' ? 'All Profiles' : 
@@ -259,7 +314,12 @@ const TherapistValidationDashboard: React.FC = () => {
         </div>
 
         {/* Therapist Cards */}
-        {filteredTherapists.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-8 h-8 text-slate-400 animate-spin mx-auto" />
+            <p className="mt-2 text-slate-600">Loading therapists...</p>
+          </div>
+        ) : filteredTherapists.length === 0 ? (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-slate-200">
             <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-900 mb-2">
@@ -273,17 +333,39 @@ const TherapistValidationDashboard: React.FC = () => {
           <div className="grid grid-cols-1 gap-6">
             {filteredTherapists.map((therapist) => (
               <div key={therapist.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-slate-200 overflow-hidden">
-                {/* Header */}
+                {/* Header with therapist info */}
                 <div className={`p-6 text-white ${
                   therapist.statutProfil === 'VALIDE' ? 'bg-green-600' :
                   therapist.statutProfil === 'REJETE' ? 'bg-red-600' : 'bg-blue-600'
                 }`}>
                   <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-xl font-bold">Therapist Profile</h3>
-                      <div className="flex items-center mt-1 text-sm opacity-90">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {therapist.anneesExperience} years of experience
+                    <div className="flex items-center space-x-4">
+                      {/* Profile picture or initials */}
+                      {therapist.user?.profilePictureUrl ? (
+                        <img
+                          src={therapist.user.profilePictureUrl}
+                          alt={therapist.user.name}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-white bg-opacity-20 flex items-center justify-center border-2 border-white">
+                          <span className="text-lg font-bold">
+                            {therapist.user ? getInitials(therapist.user.name) : '?'}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="text-xl font-bold">
+                          {therapist.user?.name || 'Unknown Therapist'}
+                        </h3>
+                        <div className="flex items-center mt-1 text-sm opacity-90">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {therapist.anneesExperience} years of experience
+                        </div>
+                        <div className="flex items-center mt-1 text-sm opacity-90">
+                          <Phone className="w-4 h-4 mr-1" />
+                          {therapist.user?.phoneNumber || 'Phone not available'}
+                        </div>
                       </div>
                     </div>
                     <div className="bg-white bg-opacity-20 px-3 py-1 rounded-full">
@@ -295,7 +377,7 @@ const TherapistValidationDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Content */}
+                {/* Rest of the therapist card content - keep the same */}
                 <div className="p-6">
                   {/* Specialties */}
                   <div className="mb-6">
@@ -309,6 +391,18 @@ const TherapistValidationDashboard: React.FC = () => {
                           {spec}
                         </span>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Contact info */}
+                  <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center text-slate-600">
+                      <Mail className="w-4 h-4 mr-2 text-teal-500" />
+                      <span className="text-sm">{therapist.user?.email || 'Email not available'}</span>
+                    </div>
+                    <div className="flex items-center text-slate-600">
+                      <Phone className="w-4 h-4 mr-2 text-teal-500" />
+                      <span className="text-sm">{therapist.user?.phoneNumber || 'Phone not available'}</span>
                     </div>
                   </div>
 
@@ -456,6 +550,7 @@ const TherapistValidationDashboard: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

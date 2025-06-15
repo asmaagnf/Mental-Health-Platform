@@ -29,6 +29,7 @@ import PendingPage from './pages/ProfileRed/PendingPage';
 import RefusedPage from './pages/ProfileRed/RefusedPage ';
 import TherapistSessionList from './pages/LiveSesssion/TherapistSessionList';
 import PatientSessionList from './pages/LiveSesssion/PatientSessionList';
+import BookingConfirmationPage from './components/BookingConfirmationPage';
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="therapists" element={<TherapistListPage />} />
             <Route path="therapists/:id" element={<TherapistDetailPage />} />
+             <Route path="booking-confirmation/:id" element={<BookingConfirmationPage/>} />
             <Route path="historiqueSeance" element={<SessionHistoryPatient />} />
             <Route path="LiveSeance" element={<PatientSessionList />} />
              <Route path="patientPaymentHistory" element={<PaymentHistory />} />

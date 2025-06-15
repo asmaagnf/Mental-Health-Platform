@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, Video, User, Star } from 'lucide-react';
 import { SessionType, SessionStatus } from '../../types/entities';
 import axios from 'axios';
+import { Toaster } from 'react-hot-toast';
+import SessionRatingForm from '../../components/SessionRatingForm';
 
 interface User {
   id: string;
@@ -36,38 +38,46 @@ const SessionHistoryPatient: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [therapists, setTherapists] = useState<Record<string, User>>({});
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<{
+    sessionId: string;
+    therapistId: string;
+  } | null>(null);
   
   const user = JSON.parse(localStorage.getItem("user") || '{}');
   const userId = user?.id;
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const response = await axios.get(`http://localhost:8070/api/seances/patient/${userId}`);
-        const completedSessions = response.data.filter((session: Session) => session.statutSeance === 'TERMINEE');
-        setSessions(completedSessions);
-        
-        // Fetch therapist info for each session
-        const therapistIds = [...new Set(completedSessions.map((session: Session) => session.therapeuteId))];
-        const therapistsData: Record<string, User> = {};
-        
-        for (const id of therapistIds) {
-          const therapistResponse = await axios.get(`http://localhost:8090/api/user/${id}`);
-          therapistsData[id] = therapistResponse.data;
-        }
-        
-        setTherapists(therapistsData);
-      } catch (error) {
-        console.error('Error fetching sessions:', error);
-      } finally {
-        setLoading(false);
+  const fetchSessions = async () => {
+    try {
+      const response = await axios.get(`http://localhost:8070/api/seances/patient/${userId}`);
+      const completedSessions = response.data.filter((session: Session) => session.statutSeance === 'TERMINEE');
+      setSessions(completedSessions);
+      
+      const therapistIds = [...new Set(completedSessions.map((session: Session) => session.therapeuteId))];
+      const therapistsData: Record<string, User> = {};
+      
+      for (const id of therapistIds) {
+        const therapistResponse = await axios.get(`http://localhost:8090/api/user/${id}`);
+        therapistsData[id] = therapistResponse.data;
       }
-    };
+      
+      setTherapists(therapistsData);
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (userId) {
       fetchSessions();
     }
   }, [userId]);
+
+  const handleRatingSubmitted = () => {
+    fetchSessions(); // Rafraîchir les données après évaluation
+  };
 
   const getStatusBadge = (status: SessionStatus) => {
     const styles = {
@@ -101,6 +111,8 @@ const SessionHistoryPatient: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Toaster position="top-right" />
+      
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-slate-900 mb-2">Mes séances</h2>
         <p className="text-slate-600">Consultez l'historique de vos séances avec vos thérapeutes</p>
@@ -173,7 +185,16 @@ const SessionHistoryPatient: React.FC = () => {
                   <div className="text-sm text-slate-500">
                     Séance terminée le {sessionDate.toLocaleDateString('fr-FR')}
                   </div>
-                  <button className="flex items-center space-x-1 text-teal-600 hover:text-teal-700 text-sm font-medium transition-colors">
+                  <button 
+                    onClick={() => {
+                      setSelectedSession({
+                        sessionId: session.seanceId,
+                        therapistId: session.therapeuteId
+                      });
+                      setShowRatingForm(true);
+                    }}
+                    className="flex items-center space-x-1 text-teal-600 hover:text-teal-700 text-sm font-medium transition-colors"
+                  >
                     <Star className="w-4 h-4" />
                     <span>Évaluer cette séance</span>
                   </button>
@@ -190,6 +211,15 @@ const SessionHistoryPatient: React.FC = () => {
           <h3 className="text-lg font-medium text-slate-900 mb-2">Aucune séance terminée</h3>
           <p className="text-slate-500">L'historique de vos séances apparaîtra ici une fois terminées.</p>
         </div>
+      )}
+
+      {showRatingForm && selectedSession && (
+        <SessionRatingForm
+          seanceId={selectedSession.sessionId}
+          therapistId={selectedSession.therapistId}
+          onClose={() => setShowRatingForm(false)}
+          onRatingSubmitted={handleRatingSubmitted}
+        />
       )}
     </div>
   );

@@ -8,7 +8,7 @@ interface Feedback {
   therapistId: string;
   rating: number;
   comment: string;
-  createdAt: string;
+  sentAt: string;
 }
 
 interface Patient {
@@ -77,7 +77,6 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({
         setPatients(patientsData);
         setLoading(false);
       } catch (err) {
-        setError('Failed to load feedbacks. Please try again later.');
         setLoading(false);
         console.error('Error fetching feedbacks:', err);
       }
@@ -143,7 +142,7 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({
               <div className="flex items-start">
                 <div className="mr-4">
                   <img
-                    src={patient.profilePictureUrl || "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80"}
+                    src={`http://localhost:8090${patient.profilePictureUrl}` || "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80"}
                     alt={patient.name}
                     className="w-12 h-12 rounded-full object-cover"
                   />
@@ -153,7 +152,7 @@ const FeedbackSection: React.FC<FeedbackSectionProps> = ({
                     <div>
                       <h3 className="font-medium text-slate-900">{patient.name}</h3>
                       <p className="text-sm text-slate-500">
-                        {new Date(feedback.createdAt).toLocaleDateString()}
+                        {new Date(feedback.sentAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center">

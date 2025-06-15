@@ -57,7 +57,7 @@ public class UserService {
         user.setPhoneNumber(new PhoneNumber(updatedDto.getPhoneNumber()));
         user.setAddress(Address.fromString(updatedDto.getAddress()));
         user.setProfilePictureUrl(updatedDto.getProfilePictureUrl());
-
+        user.setDateOfBirth(updatedDto.getDateOfBirth());
         return userMapper.toDTO(userRepository.save(user));
     }
 

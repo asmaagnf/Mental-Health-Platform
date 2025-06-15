@@ -49,41 +49,68 @@ const TherapistListPage: React.FC = () => {
     availableToday: false,
     priceRange: ''
   });
-  const [showFilters, setShowFilters] = useState(false);
-  const [therapists, setTherapists] = useState<CombinedTherapist[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+ const [showFilters, setShowFilters] = useState(false);
+const [therapists, setTherapists] = useState<CombinedTherapist[]>([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+const [averageRatings, setAverageRatings] = useState<Record<string, number | null>>({});
+const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+useEffect(() => {
+  // Check if user is logged in
+  const user = localStorage.getItem('user');
+  setIsLoggedIn(!!user);
+
+  const fetchTherapists = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch therapists
+      const therapistsRes = await axios.get('http://localhost:8040/api/therapeutes/profiles/all/valides');
+      
+      // Fetch user data and ratings for each therapist
+      const combinedTherapists = await Promise.all(
+        therapistsRes.data.map(async (therapist: Therapist) => {
+          try {
+            const [userRes, ratingRes] = await Promise.all([
+              axios.get(`http://localhost:8090/api/user/${therapist.userId}`),
+              axios.get(`http://localhost:8030/api/feedbacks/therapist/${therapist.userId}/average`)
+            ]);
+            
+            const avg = Number(ratingRes.data);
+            const rating = isNaN(avg) ? null : avg;
+            
+            // Update ratings state
+            setAverageRatings(prev => ({...prev, [therapist.userId]: rating}));
+            
+            return { 
+              ...therapist, 
+              user: userRes.data,
+              averageRating: rating
+            };
+          } catch (error) {
+            console.error(`Error fetching data for therapist ${therapist.userId}:`, error);
+            return { 
+              ...therapist, 
+              user: null,
+              averageRating: null
+            };
+          }
+        })
+      );
+      
+      setTherapists(combinedTherapists);
+    } catch (err) {
+      console.error('Error fetching therapists:', err);
+      setError('Failed to load therapists. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  useEffect(() => {
-    const fetchTherapists = async () => {
-      try {
-        // Fetch therapists
-        const therapistsRes = await axios.get('http://localhost:8040/api/therapeutes/profiles/all/valides');
-        
-        // Fetch user data for each therapist
-        const combinedTherapists = await Promise.all(
-          therapistsRes.data.map(async (therapist: Therapist) => {
-            try {
-              const userRes = await axios.get(`http://localhost:8090/api/user/${therapist.userId}`);
-              return { ...therapist, user: userRes.data };
-            } catch (userError) {
-              console.error(`Error fetching user ${therapist.userId}:`, userError);
-              return { ...therapist, user: null };
-            }
-          })
-        );
-        
-        setTherapists(combinedTherapists);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load therapists. Please try again later.');
-        setLoading(false);
-        console.error('Error fetching therapists:', err);
-      }
-    };
-    
-    fetchTherapists();
-  }, []);
+  fetchTherapists();
+}, []);
   
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -245,7 +272,9 @@ const TherapistListPage: React.FC = () => {
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-1/4">
                   <img 
-                    src={therapist.user?.profilePictureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80"} 
+                    src={therapist.user?.profilePictureUrl 
+                      ? `http://localhost:8090${therapist.user.profilePictureUrl}`
+                      : "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80"} 
                     alt={therapist.user?.name} 
                     className="w-full h-48 md:h-full object-cover object-center"
                   />
@@ -259,9 +288,13 @@ const TherapistListPage: React.FC = () => {
                       </p>
                     </div>
                     <div className="flex items-center">
-                      <Star className="h-5 w-5 text-yellow-500 fill-current" />
-                      <span className="ml-1 font-medium">4.5</span>
-                      <span className="text-slate-500 ml-1">(12 reviews)</span>
+                    <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                    <span className="ml-1 font-medium">
+                      {averageRatings[therapist.userId] !== null ? averageRatings[therapist.userId]?.toFixed(1) : 'N/A'}
+                    </span>
+                    <span className="text-slate-500 ml-1">
+                      ({averageRatings[therapist.userId] !== null ? 'based on reviews' : 'no reviews yet'})
+                    </span>
                     </div>
                   </div>
                   
@@ -289,14 +322,25 @@ const TherapistListPage: React.FC = () => {
                   <div className="mt-6 flex justify-between items-center">
                     <div className="text-xl font-bold text-slate-900">{therapist.prixParHeure} DH <span className="text-slate-500 text-base font-normal">/ session</span></div>
                     <div className="flex gap-3">
-                      <Link 
-                        to={`/therapists/${therapist.id}`}
-                        className="btn btn-outline"
-                      >
-                        View Profile
-                      </Link>
+                      {!isLoggedIn ? (
+                        <Link 
+                          to={`/therapists/${therapist.userId}`}
+                          className="btn btn-outline"
+                        >
+                          View Profile
+                        </Link>
+                      ) : (
+                        <Link 
+                          to={`/patient/therapists/${therapist.userId}`}
+                          className="btn btn-outline"
+                        >
+                          View Profile
+                        </Link>
+                      )}
                       <Link
-                        to={`/appointments/book/${therapist.id}`}
+                        to={isLoggedIn 
+                          ? `/appointments/book/${therapist.userId}`
+                          : '/login?redirect=/therapists'}
                         className="btn btn-primary"
                       >
                         Book Session

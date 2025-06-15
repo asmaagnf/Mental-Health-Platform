@@ -12,6 +12,7 @@ const UpcomingSessions: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [otherUsers, setOtherUsers] = useState<Record<string, UserInfo>>({});
   const [cancelingSession, setCancelingSession] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [loading, setLoading] = useState(true);
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -93,15 +94,30 @@ const UpcomingSessions: React.FC = () => {
   };
 
   const handleCancelSession = async (sessionId: string) => {
+    if (!cancelReason.trim()) {
+      alert("Veuillez fournir un motif d'annulation");
+      return;
+    }
+
     try {
-      await fetch(`http://localhost:8070/api/seances/${sessionId}/annuler`, {
+      const response = await fetch(`http://localhost:8070/api/seances/${sessionId}/annuler`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ motif: cancelReason })
       });
+
+      if (!response.ok) {
+        throw new Error("Échec de l'annulation");
+      }
+
       setSessions(prev => prev.filter(session => session.seanceId !== sessionId));
     } catch (error) {
       console.error("Erreur lors de l'annulation:", error);
     } finally {
       setCancelingSession(null);
+      setCancelReason('');
     }
   };
 
@@ -219,13 +235,25 @@ const UpcomingSessions: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-900">Annuler la séance</h3>
             </div>
 
-            <p className="text-slate-600 mb-6">
-              Êtes-vous sûr de vouloir annuler cette séance ? Cette action ne peut pas être annulée.
+            <p className="text-slate-600 mb-4">
+              Êtes-vous sûr de vouloir annuler cette séance ? Veuillez indiquer le motif.
             </p>
+
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full p-3 border border-slate-300 rounded-lg mb-4"
+              placeholder="Motif d'annulation..."
+              rows={3}
+              required
+            />
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setCancelingSession(null)}
+                onClick={() => {
+                  setCancelingSession(null);
+                  setCancelReason('');
+                }}
                 className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Garder la séance
@@ -234,7 +262,7 @@ const UpcomingSessions: React.FC = () => {
                 onClick={() => handleCancelSession(cancelingSession)}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
-                Annuler la séance
+                Confirmer l'annulation
               </button>
             </div>
           </div>

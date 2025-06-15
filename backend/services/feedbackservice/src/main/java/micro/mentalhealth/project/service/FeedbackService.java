@@ -18,7 +18,7 @@ public class FeedbackService {
     }
 
     public Feedback createFeedback(Feedback feedback) {
-        // ✅ Assigne un UUID si le champ id est null
+        // Assigne un UUID si le champ id est null
         if (feedback.getId() == null) {
             feedback.setId(UUID.randomUUID());
         }

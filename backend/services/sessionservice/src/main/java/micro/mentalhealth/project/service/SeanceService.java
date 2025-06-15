@@ -89,6 +89,10 @@ public class SeanceService {
     // -------------- Check therapist availability -------------
     public boolean isTherapistAvailable(UUID therapistId, LocalDateTime dateTime, int dureeMinutes) {
         // 1. Récupérer disponibilités du thérapeute via REST
+        System.out.println("Checking availability for therapist: " + therapistId);
+        System.out.println("Requested time: " + dateTime);
+        System.out.println("Duration: " + dureeMinutes + " minutes");
+
         String url = "http://therapeute-service/api/therapeutes/" + therapistId + "/disponibilites";
         DisponibiliteDTO[] disponibilites = restTemplate.getForObject(url, DisponibiliteDTO[].class);
 
