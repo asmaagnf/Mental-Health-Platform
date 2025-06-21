@@ -4,11 +4,11 @@ import jakarta.transaction.Transactional;
 import micro.mentalhealth.project.dto.DisponibiliteDTO;
 import micro.mentalhealth.project.dto.PlageHoraireDTO;
 import micro.mentalhealth.project.dto.SeanceDTO;
+import micro.mentalhealth.project.dto.NotificationRequest;
+import micro.mentalhealth.project.model.NotificationType;
+import micro.mentalhealth.project.service.NotificationProducer;
 import micro.mentalhealth.project.mapper.SeanceMapper;
-import micro.mentalhealth.project.model.LienVisio;
-import micro.mentalhealth.project.model.Seance;
-import micro.mentalhealth.project.model.StatutSeance;
-import micro.mentalhealth.project.model.TypeSeance;
+import micro.mentalhealth.project.model.*;
 import micro.mentalhealth.project.repository.SeanceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +30,29 @@ public class SeanceService {
     private SeanceMapper seanceMapper;
     @Autowired
     private RestTemplate restTemplate;
+    @Autowired
+    private NotificationProducer notificationProducer;
+
+
+    private void sendSeanceNotification(UUID seanceId, UUID patientId, UUID therapistId,
+                                        String patientMessage, String therapistMessage,
+                                        NotificationType type) {
+        // Send to patient
+        NotificationRequest patientRequest = new NotificationRequest();
+        patientRequest.setUserId(patientId);
+        patientRequest.setMessage(patientMessage);
+        patientRequest.setType(type);
+        patientRequest.setRelatedEntityId(seanceId);
+        notificationProducer.sendNotification(patientRequest);
+
+        // Send to therapist
+        NotificationRequest therapistRequest = new NotificationRequest();
+        therapistRequest.setUserId(therapistId);
+        therapistRequest.setMessage(therapistMessage);
+        therapistRequest.setType(type);
+        therapistRequest.setRelatedEntityId(seanceId);
+        notificationProducer.sendNotification(therapistRequest);
+    }
 
     public List<SeanceDTO> getAllSeances() {
         return seanceMapper.toDTOList(seanceRepository.findAll());
@@ -180,6 +203,12 @@ public class SeanceService {
         seance.setStatutSeance(StatutSeance.PLANIFIEE);
         Seance updated = seanceRepository.save(seance);
 
+        String patientMsg = "Your session is confirmed for " + updated.getDateHeure();
+        String therapistMsg = "Session confirmed with patient for " + updated.getDateHeure();
+        sendSeanceNotification(seanceId, updated.getPatientId(), updated.getTherapeuteId(),
+                patientMsg, therapistMsg,
+                NotificationType.PAYMENT_CONFIRMED);
+
         return seanceMapper.toDTO(updated);
     }
 
@@ -242,7 +271,11 @@ public class SeanceService {
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new RuntimeException("Échec du remboursement");
         }
-
+        String patientMsg = "Your session has been cancelled. Reason: " + motif;
+        String therapistMsg = "Session cancelled. Reason: " + motif;
+        sendSeanceNotification(seanceId, seance.getPatientId(), seance.getTherapeuteId(),
+                patientMsg, therapistMsg,
+                NotificationType.SEANCE_CANCELLED);
         return seanceMapper.toDTO(seance);
     }
 
@@ -259,7 +292,11 @@ public class SeanceService {
             throw new RuntimeException("Erreur lors de la récupération du paiement : " + ex.getMessage());
         }
     }
+    public long getPatientCountForTherapist(UUID therapistId) {
+        return seanceRepository.countDistinctPatientsByTherapistId(therapistId);
+    }
 
+    @Transactional
     public SeanceDTO terminerSeance(UUID seanceId) {
         Seance seance = seanceRepository.findById(seanceId)
                 .orElseThrow(() -> new RuntimeException("Séance introuvable"));
@@ -269,11 +306,20 @@ public class SeanceService {
         }
 
         if (LocalDateTime.now().isBefore(seance.getDateHeure().plusMinutes(seance.getDureeMinutes()))) {
-            throw new RuntimeException("La séance n’est pas encore terminée");
+            throw new RuntimeException("La séance n'est pas encore terminée");
         }
 
         seance.setStatutSeance(StatutSeance.TERMINEE);
-        return seanceMapper.toDTO(seanceRepository.save(seance));
+        Seance updatedSeance = seanceRepository.save(seance);
+
+        // Send notifications
+        String patientMsg = "Your session has been completed. Please provide feedback.";
+        String therapistMsg = "Session with patient completed.";
+        sendSeanceNotification(seanceId, updatedSeance.getPatientId(), updatedSeance.getTherapeuteId(),
+                patientMsg, therapistMsg,
+                NotificationType.SEANCE_COMPLETED);
+
+        return seanceMapper.toDTO(updatedSeance);
     }
 
     // ---- Replaced Lombok by standard constructors and getters/setters ----
@@ -300,21 +346,6 @@ public class SeanceService {
         public void setAmount(float amount) { this.amount = amount; }
     }
 
-    static class NotificationRequest {
-        private UUID userId;
-        private String message;
-
-        public NotificationRequest(UUID userId, String message) {
-            this.userId = userId;
-            this.message = message;
-        }
-
-        public UUID getUserId() { return userId; }
-        public void setUserId(UUID userId) { this.userId = userId; }
-
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
-    }
 
     static class CreateRemboursementRequest {
         private UUID paiementId;

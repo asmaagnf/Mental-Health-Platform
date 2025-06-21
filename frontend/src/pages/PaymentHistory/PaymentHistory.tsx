@@ -148,11 +148,11 @@ const PaymentHistory: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 shadow rounded">
           <p className="text-sm text-gray-500">Total Paid</p>
-          <p className="text-2xl font-bold">${totalPaid.toFixed(2)}</p>
+          <p className="text-2xl font-bold">MAD {totalPaid.toFixed(2)}</p>
         </div>
         <div className="bg-white p-4 shadow rounded">
           <p className="text-sm text-gray-500">Pending Amount</p>
-          <p className="text-2xl font-bold">${pendingAmount.toFixed(2)}</p>
+          <p className="text-2xl font-bold">MAD {pendingAmount.toFixed(2)}</p>
         </div>
         <div className="bg-white p-4 shadow rounded">
           <p className="text-sm text-gray-500">Payments Count</p>
@@ -207,7 +207,7 @@ const PaymentHistory: React.FC = () => {
                     <tr key={p.id} className="border-t">
                       <td className="p-2">{p.id}</td>
                       <td className="p-2">{therapistNames[p.therapistId] || 'Loading...'}</td>
-                      <td className="p-2">${p.amount.toFixed(2)}</td>
+                      <td className="p-2">MAD {p.amount.toFixed(2)}</td>
                       <td className="p-2">{p.paymentMethod}</td>
                       <td className="p-2">
                         <span className={`px-2 py-1 text-xs rounded ${getStatusColor(p.paymentStatus)}`}>

@@ -32,6 +32,8 @@ public class PaymentService {
     private  PaymentRepository paymentRepository;
     @Autowired
     private  RemboursementRepository remboursementRepository;
+    @Autowired
+    private NotificationProducer notificationProducer;
 
     private final TherapistEarningsRepository therapistEarningsRepository;
 
@@ -41,6 +43,15 @@ public class PaymentService {
         Payment payment = PaymentMapper.toEntity(request);
         payment.setPaymentStatus(PaymentStatus.REUSSI); // For manual project, assume always successful
         Payment saved = paymentRepository.save(payment);
+        // Add notification
+        String patientMsg = "Payment of " + request.getAmount() + " confirmed";
+        NotificationRequest notification = new NotificationRequest(
+                request.getPatientId(),
+                patientMsg,
+                NotificationType.PAYMENT_CONFIRMED,
+                saved.getId()
+        );
+        notificationProducer.sendNotification(notification);
         updateTherapistEarnings(request.getTherapistId(), request.getAmount());
         return PaymentMapper.toDTO(saved);
     }
@@ -152,7 +163,14 @@ public class PaymentService {
 
         // Deduct from therapist earnings
         deductFromEarnings(payment.getTherapistId(), request.getMontant());
-
+        String patientMsg = "Your refund of " + request.getMontant() + " has been processed";
+        NotificationRequest notification = new NotificationRequest(
+                payment.getPatientId(),
+                patientMsg,
+                NotificationType.PAYMENT_REFUNDED,
+                payment.getId()
+        );
+        notificationProducer.sendNotification(notification);
         return RemboursementMapper.toDTO(saved);
     }
 

@@ -4,6 +4,7 @@ import micro.mentalhealth.project.model.Seance;
 import micro.mentalhealth.project.model.StatutSeance;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,4 +22,15 @@ public interface SeanceRepository extends JpaRepository<Seance, UUID> {
     List<Seance> findConflictingSeances(UUID therapeuteId, LocalDateTime debut, LocalDateTime fin);
     List<Seance> findByTherapeuteIdAndDateHeureBetween(UUID therapeuteId, LocalDateTime start, LocalDateTime end);
 
+
+    @Query(value = "SELECT COUNT(DISTINCT patient_id) " +
+            "FROM seances " +
+            "WHERE therapeute_id = :therapistId " +
+            "AND statut_seance = 'TERMINEE'",
+            nativeQuery = true)
+    long countDistinctPatientsByTherapistId(@Param("therapistId") UUID therapistId);
 }
+
+
+
+

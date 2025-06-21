@@ -21,7 +21,6 @@ import PaymentHistory from './pages/PaymentHistory/PaymentHistory';
 import NotFoundPage from './pages/NotFoundPage';
 import SessionHistoryTherapist from './pages/SessionHistory/SessionHistoryTherapist';
 import SessionHistoryPatient from './pages/SessionHistory/SessionHistoryPatient';
-import LiveSession from './pages/LiveSesssion/LiveSession';
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import CreerTherapistProfile from './pages/profile/CreerTherapistProfile';
@@ -30,6 +29,10 @@ import RefusedPage from './pages/ProfileRed/RefusedPage ';
 import TherapistSessionList from './pages/LiveSesssion/TherapistSessionList';
 import PatientSessionList from './pages/LiveSesssion/PatientSessionList';
 import BookingConfirmationPage from './components/BookingConfirmationPage';
+import AdminFeedbackDashboard from './pages/AdminPages/AdminFeedbackDashboard';
+import AdminPaymentDashboard from './pages/AdminPages/AdminPaymentDashboard';
+import NotificationsPage from './pages/Notification/NotificationsPage';
+import UserListPage from './pages/AdminPages/UserListPage';
 
 function App() {
   return (
@@ -62,6 +65,7 @@ function App() {
              <Route path="booking-confirmation/:id" element={<BookingConfirmationPage/>} />
             <Route path="historiqueSeance" element={<SessionHistoryPatient />} />
             <Route path="LiveSeance" element={<PatientSessionList />} />
+             <Route path="notifications" element={<NotificationsPage />} />
              <Route path="patientPaymentHistory" element={<PaymentHistory />} />
           </Route>
 
@@ -76,6 +80,7 @@ function App() {
              <Route path="historiqueSeance" element={<SessionHistoryTherapist />} />
              <Route path="LiveSeance" element={<TherapistSessionList />} />
             <Route path="TherapistProfile" element={<TherapistProfileEdit />} />
+            <Route path="notifications" element={<NotificationsPage />} />
             <Route path="patientPaymentHistory" element={<PaymentHistory />} />
           </Route>
 
@@ -86,7 +91,9 @@ function App() {
             </ProtectedRoute>
           }>
             <Route path="dashboard" element={<AdminDashboard />} />
-            
+            <Route path="feedbackList" element={<AdminFeedbackDashboard />} />
+             <Route path="paymentList" element={<AdminPaymentDashboard />} />
+              <Route path="userList" element={<UserListPage/>} />
           </Route>
 
           {/* 404 */}

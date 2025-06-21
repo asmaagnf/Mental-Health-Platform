@@ -65,7 +65,7 @@ const TherapistProfileEdit: React.FC = () => {
     year: new Date().getFullYear(),
     imageUrl: null as string | null
   });
-  const [diplomaImage, setDiplomaImage] = useState<File | null>(null);
+  const [diplomaFiles, setDiplomaFiles] = useState<Record<number, File>>({});
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [newAvailability, setNewAvailability] = useState({
     jour: 'MONDAY',
@@ -76,6 +76,7 @@ const TherapistProfileEdit: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [localAvailabilities, setLocalAvailabilities] = useState<Availability[]>([]);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get therapist ID from localStorage
@@ -213,7 +214,6 @@ const TherapistProfileEdit: React.FC = () => {
     }
   };
 
-  // Add new availability to local state
   const addNewAvailability = () => {
     setLocalAvailabilities([
       ...localAvailabilities,
@@ -235,7 +235,6 @@ const TherapistProfileEdit: React.FC = () => {
     setHasChanges(true);
   };
 
-  // Delete an availability from local state
   const deleteAvailability = (index: number) => {
     const updated = [...localAvailabilities];
     updated.splice(index, 1);
@@ -243,19 +242,15 @@ const TherapistProfileEdit: React.FC = () => {
     setHasChanges(true);
   };
 
-  const handleImageUpload = async (file: File, isProfilePicture: boolean = false) => {
+  const uploadProfileImage = async (file: File) => {
     if (!file || !therapistId) return null;
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const endpoint = isProfilePicture 
-        ? `http://localhost:8090/api/user/${therapistId}/upload-profile-picture`
-        : `http://localhost:8040/api/therapeutes/profiles/${therapistId}/diplomas/upload`;
-      
       const response = await axios.post(
-        endpoint,
+        `http://localhost:8090/api/user/${therapistId}/upload-profile-picture`,
         formData,
         {
           headers: {
@@ -264,48 +259,112 @@ const TherapistProfileEdit: React.FC = () => {
         }
       );
       
-      return isProfilePicture 
-        ? response.data.profilePictureUrl 
-        : response.data.imageUrl;
+      return response.data.profilePictureUrl;
     } catch (error) {
-      console.error('Error uploading image:', error);
-      return null;
+      console.error('Error uploading profile image:', error);
+      throw error;
+    }
+  };
+
+  const uploadDiplomaImage = async (file: File, diplomaTitle: string) => {
+    if (!file || !therapistId) return null;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('diplomaTitle', diplomaTitle);
+
+    try {
+      const response = await axios.post(
+        `http://localhost:8040/api/therapeutes/profiles/${therapistId}/diplomas/upload`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading diploma image:', error);
+      throw error;
     }
   };
 
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please select an image file (JPEG, PNG)');
-            return;
-        }
+      const file = e.target.files[0];
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file (JPEG, PNG)');
+        return;
+      }
 
-        // Validate file size (e.g., 2MB max)
-        if (file.size > 2 * 1024 * 1024) {
-            alert('Image size should be less than 2MB');
-            return;
-        }
+      // Validate file size (e.g., 2MB max)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Image size should be less than 2MB');
+        return;
+      }
 
-        setProfileImage(file);
-        
-        // Preview the image
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            if (userData && event.target?.result) {
-                setUserData({
-                    ...userData,
-                    profilePictureUrl: event.target.result as string
-                });
-            }
-        };
-        reader.readAsDataURL(file);
-        
-        setHasChanges(true);
+      setProfileImage(file);
+      
+      // Preview the image
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (userData && event.target?.result) {
+          setUserData({
+            ...userData,
+            profilePictureUrl: event.target.result as string
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+      
+      setHasChanges(true);
     }
-};
+  };
+
+  const handleDiplomaImageChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    if (e.target.files && e.target.files[0] && profileData) {
+      const file = e.target.files[0];
+      const diploma = profileData.diplomas[index];
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file (JPEG, PNG)');
+        return;
+      }
+
+      // Validate file size (e.g., 2MB max)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Image size should be less than 2MB');
+        return;
+      }
+
+      setDiplomaFiles(prev => ({ ...prev, [index]: file }));
+      
+      // Preview the image
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const updatedDiplomas = [...profileData.diplomas];
+          updatedDiplomas[index] = {
+            ...updatedDiplomas[index],
+            imageUrl: event.target.result as string
+          };
+          setProfileData({
+            ...profileData,
+            diplomas: updatedDiplomas
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+      
+      setHasChanges(true);
+    }
+  };
+
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -315,25 +374,26 @@ const TherapistProfileEdit: React.FC = () => {
   const handleSave = async () => {
     if (!profileData || !userData || !therapistId) return;
 
-try {
-        // First upload profile picture if changed
-        let profilePictureUrl = userData.profilePictureUrl;
-        if (profileImage) {
-            const uploadedUrl = await handleImageUpload(profileImage, true);
-            if (uploadedUrl) {
-                profilePictureUrl = uploadedUrl;
-            } else {
-                throw new Error('Failed to upload profile picture');
-            }
+    setUploading(true);
+    try {
+      // First upload profile picture if changed
+      let profilePictureUrl = userData.profilePictureUrl;
+      if (profileImage) {
+        const uploadedUrl = await uploadProfileImage(profileImage);
+        if (uploadedUrl) {
+          profilePictureUrl = uploadedUrl;
+        } else {
+          throw new Error('Failed to upload profile picture');
         }
-
+      }
 
       // Then upload any diploma images
       const updatedDiplomas = await Promise.all(
-        profileData.diplomas.map(async (diploma) => {
-          if (diplomaImage && !diploma.imageUrl) {
-            const imageUrl = await handleImageUpload(diplomaImage);
-            return { ...diploma, imageUrl };
+        profileData.diplomas.map(async (diploma, index) => {
+          const file = diplomaFiles[index];
+          if (file) {
+            const imageUrl = await uploadDiplomaImage(file, diploma.title);
+            return { ...diploma, imageUrl: imageUrl ? `http://localhost:8040${imageUrl}` : diploma.imageUrl };
           }
           return diploma;
         })
@@ -376,11 +436,15 @@ try {
 
       setHasChanges(false);
       setIsEditing(false);
+      setProfileImage(null);
+      setDiplomaFiles({});
       fetchProfileData(); // Refresh all data
-      alert('Profile saved successfully!');
+      toast.success('Profile saved successfully!');
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Failed to save profile. Please try again.');
+      toast.error('Failed to save profile. Please try again.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -389,6 +453,7 @@ try {
     setHasChanges(false);
     setIsEditing(false);
     setProfileImage(null);
+    setDiplomaFiles({});
   };
 
   if (loading) {
@@ -428,18 +493,38 @@ try {
           <div className="flex space-x-3">
             {hasChanges && (
               <>
-                <button onClick={handleCancel} className="btn btn-outline">
+                <button 
+                  onClick={handleCancel} 
+                  className="flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  disabled={uploading}
+                >
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </button>
-                <button onClick={handleSave} className="btn btn-primary">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                <button 
+                  onClick={handleSave} 
+                  className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700"
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </>
             )}
             {!isEditing && !hasChanges && (
-              <button onClick={() => setIsEditing(true)} className="btn btn-primary">
+              <button 
+                onClick={() => setIsEditing(true)} 
+                className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700"
+              >
                 Edit Profile
               </button>
             )}
@@ -458,6 +543,11 @@ try {
                   : `http://localhost:8090${userData.profilePictureUrl}`}
                 alt="Profile"
                 className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-lg"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = '/default-profile.png';
+                }}
               />
             ) : (
               <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
@@ -635,7 +725,7 @@ try {
               <div className="mb-4">
                 <div className="flex flex-wrap gap-2 mb-4">
                   {(profileData?.specialites || []).map((spec, index) => (
-                    <div key={index} className="tag tag-primary flex items-center">
+                    <div key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-teal-100 text-teal-800">
                       {spec}
                       {isEditing && (
                         <button 
@@ -673,7 +763,7 @@ try {
               <div className="mb-4">
                 <div className="flex flex-wrap gap-2 mb-4">
                   {(profileData?.languesParlees || []).map((lang, index) => (
-                    <div key={index} className="tag tag-primary flex items-center">
+                    <div key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-teal-100 text-teal-800">
                       {lang}
                       {isEditing && (
                         <button 
@@ -766,9 +856,12 @@ try {
                       {diploma.imageUrl && (
                         <div className="mt-2">
                           <img
-                            src={`http://localhost:8040${diploma.imageUrl}`}
+                            src={diploma.imageUrl.startsWith('http') 
+                              ? diploma.imageUrl 
+                              : `http://localhost:8040${diploma.imageUrl}`}
                             alt={diploma.title}
                             className="w-full h-20 object-cover rounded border"
+                           
                           />
                         </div>
                       )}
@@ -778,18 +871,28 @@ try {
                             <input
                               type="file"
                               className="hidden"
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  setDiplomaImage(e.target.files[0]);
-                                  handleDiplomaChange(index, 'imageUrl', URL.createObjectURL(e.target.files[0]));
-                                }
-                              }}
+                              onChange={(e) => handleDiplomaImageChange(e, index)}
+                              accept="image/*"
                             />
                             <span className="btn btn-outline text-sm">
                               <Camera className="h-4 w-4 mr-1" />
                               {diploma.imageUrl ? 'Change Image' : 'Upload Image'}
                             </span>
                           </label>
+                          {diplomaFiles[index] && (
+                            <button 
+                              onClick={() => uploadDiplomaImage(diplomaFiles[index], diploma.title)
+                                .then(() => {
+                                  const newDiplomaFiles = { ...diplomaFiles };
+                                  delete newDiplomaFiles[index];
+                                  setDiplomaFiles(newDiplomaFiles);
+                                })}
+                              disabled={uploading}
+                              className="ml-2 btn btn-primary text-sm"
+                            >
+                              {uploading ? 'Uploading...' : 'Save Image'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

@@ -37,6 +37,12 @@ public class SeanceController {
         return seanceService.getSeancesByTherapeuteId(therapeuteId);
     }
 
+    @GetMapping("/therapeute/{therapistId}/patient-count")
+    public ResponseEntity<Long> getPatientCountForTherapist(@PathVariable UUID therapistId) {
+        long count = seanceService.getPatientCountForTherapist(therapistId);
+        return ResponseEntity.ok(count);
+    }
+
     @GetMapping("/patient/{patientId}")
     public List<SeanceDTO> getSeancesByPatientId(@PathVariable UUID patientId) {
         return seanceService.getSeancesByPatientId(patientId);

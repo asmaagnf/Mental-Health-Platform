@@ -21,6 +21,9 @@ const navigate = useNavigate();
                           </Link>
             <div className="flex space-x-4 items-center">
               <NavLink to="/admin/dashboard" className={({ isActive }) => navStyle(isActive)}>Dashboard</NavLink>
+              <NavLink to="/admin/feedbackList" className={({ isActive }) => navStyle(isActive)}>feedback Liste</NavLink>
+                  <NavLink to="/admin/paymentList" className={({ isActive }) => navStyle(isActive)}>payment Liste</NavLink>
+                  <NavLink to="/admin/userList" className={({ isActive }) => navStyle(isActive)}>user Liste</NavLink>
               <button
                 onClick={handleLogout}
                 className="px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:text-red-700"

@@ -1,7 +1,10 @@
 package micro.mentalhealth.project.service;
 
+import micro.mentalhealth.project.dto.NotificationRequest;
 import micro.mentalhealth.project.model.Feedback;
+import micro.mentalhealth.project.model.NotificationType;
 import micro.mentalhealth.project.repository.FeedbackRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -10,6 +13,9 @@ import java.util.UUID;
 
 @Service
 public class FeedbackService {
+
+    @Autowired
+    private NotificationProducer notificationProducer;
 
     private final FeedbackRepository repository;
 
@@ -22,6 +28,15 @@ public class FeedbackService {
         if (feedback.getId() == null) {
             feedback.setId(UUID.randomUUID());
         }
+        // Add notification
+        String therapistMsg = "New feedback received from patient";
+        NotificationRequest request = new NotificationRequest(
+                feedback.getTherapistId(),
+                therapistMsg,
+                NotificationType.FEEDBACK_SUBMITTED,
+                feedback.getId()
+        );
+        notificationProducer.sendNotification(request);
         return repository.save(feedback);
     }
 

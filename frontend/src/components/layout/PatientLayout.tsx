@@ -1,4 +1,5 @@
 import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom';
+import NotificationBell from '../NotificationBell';
 
 const PatientLayout = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const PatientLayout = () => {
               <NavLink to="/patient/historiqueSeance" className={({ isActive }) => navStyle(isActive)}>historiqueSeance</NavLink>
                <NavLink to="/patient/LiveSeance" className={({ isActive }) => navStyle(isActive)}>LiveSeance</NavLink>
                <NavLink to="/patient/patientPaymentHistory" className={({ isActive }) => navStyle(isActive)}>Payments</NavLink>
+               <NotificationBell />
               <NavLink to="/patient/profile" className={({ isActive }) => navStyle(isActive)}>Profile</NavLink>
               <button
                 onClick={handleLogout}
